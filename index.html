@@ -279,6 +279,73 @@
         }
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+        /* ── 3D MULTI-FLOOR FILTER BAR & CONTROLS ── */
+        #floorFilterBar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(12, 16, 27, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 8px 12px;
+            border-radius: 14px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.55);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            z-index: 10;
+            user-select: none;
+        }
+        .floor-pill {
+            background: rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
+            padding: 6px 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .floor-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #f8fafc;
+            transform: translateY(-1px);
+        }
+        .floor-pill.active {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.45);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        #nodeTooltip {
+            position: fixed;
+            display: none;
+            pointer-events: none;
+            background: rgba(10, 15, 29, 0.92);
+            backdrop-filter: blur(10px);
+            color: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            z-index: 30;
+            line-height: 1.4;
+            max-width: 220px;
+        }
+        .view-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #cbd5e1;
+            padding: 6px 10px;
+            font-size: 0.76em;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-left: 4px;
+        }
+        .view-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
     </style>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -399,6 +466,23 @@
     
     <div id="canvas-container"></div>
 
+    <!-- ── 3D FLOATING FLOOR FILTER BAR ── -->
+    <div id="floorFilterBar">
+        <span style="font-size:0.75em; font-weight:700; color:#64748b; margin-right:4px;">FLOOR:</span>
+        <button class="floor-pill active" data-floor="all" onclick="setFloorFilter('all')">🏢 All 7 Floors</button>
+        <button class="floor-pill" data-floor="6" onclick="setFloorFilter(6)">F6</button>
+        <button class="floor-pill" data-floor="5" onclick="setFloorFilter(5)">F5</button>
+        <button class="floor-pill" data-floor="4" onclick="setFloorFilter(4)">F4</button>
+        <button class="floor-pill" data-floor="3" onclick="setFloorFilter(3)">F3</button>
+        <button class="floor-pill" data-floor="2" onclick="setFloorFilter(2)">F2</button>
+        <button class="floor-pill" data-floor="1" onclick="setFloorFilter(1)">F1</button>
+        <button class="floor-pill" data-floor="0" onclick="setFloorFilter(0)">Ground</button>
+        <button class="view-btn" onclick="reset3DCamera()" title="Reset Camera View">⟲ Reset View</button>
+    </div>
+
+    <!-- ── 3D HOVER TOOLTIP ── -->
+    <div id="nodeTooltip"></div>
+
     <!-- ── 2D FLOOR-BY-FLOOR EVACUATION TRAY ── -->
     <div id="evac2dTray">
         <div class="tray-header">
@@ -441,75 +525,436 @@
             }
         }
 
-        // --- 2. SCENE SETUP ---
+        // --- 2. 3D SCENE SETUP & ATMOSPHERE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#f8fafc'); 
-        scene.fog = new THREE.FogExp2('#0f172a', 0.015); 
+        scene.background = new THREE.Color('#0b101e'); 
+        scene.fog = new THREE.FogExp2('#0b101e', 0.002); // Soft atmospheric depth without obscuring higher floors
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
         const scale = 100;
-        camera.position.set(30, 40, 50);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; 
-        controls.dampingFactor = 0.05;
+        controls.dampingFactor = 0.06;
+        controls.maxDistance = 140;
+        controls.minDistance = 5;
 
-        // --- 3. LIGHTING ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(20, 40, 20);
-        scene.add(dirLight);
+        // --- 3. MULTI-LEVEL LIGHTING ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        
+        const topSun = new THREE.DirectionalLight(0xffffff, 0.85);
+        topSun.position.set(35, 75, 45);
+        scene.add(topSun);
 
-        const blueFillLight = new THREE.DirectionalLight(0x3b82f6, 0.3); 
-        blueFillLight.position.set(-20, 0, -20);
-        scene.add(blueFillLight);
+        const blueFill = new THREE.DirectionalLight(0x38bdf8, 0.45); 
+        blueFill.position.set(-35, 30, -35);
+        scene.add(blueFill);
 
-        // --- 4. DRAWING GRAPH (NODES & EDGES) ---
-        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xff4d4d, roughness: 0.4, metalness: 0.2 });
-        const floor1Material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4, metalness: 0.2 });
-        const sphereGeo = new THREE.SphereGeometry(0.35, 32, 32);
+        const warmBottom = new THREE.DirectionalLight(0xf59e0b, 0.3);
+        warmBottom.position.set(30, -15, 30);
+        scene.add(warmBottom);
 
-        let centerX = 0, centerY = 0, count = 0;
+        // --- 4. COLOR PALETTES & NODE CLASSIFICATION ---
+        const FLOOR_COLORS_3D = {
+            0: 0xf87171, // Ground: Coral Red
+            1: 0x38bdf8, // Floor 1: Sky Blue
+            2: 0x818cf8, // Floor 2: Indigo
+            3: 0xc084fc, // Floor 3: Purple
+            4: 0xfbbf24, // Floor 4: Amber
+            5: 0x2dd4bf, // Floor 5: Teal
+            6: 0xfb7185, // Floor 6: Rose
+        };
+
+        const FLOOR_NAMES_3D = {
+            0: 'Ground Floor',
+            1: 'Floor 1',
+            2: 'Floor 2',
+            3: 'Floor 3',
+            4: 'Floor 4',
+            5: 'Floor 5',
+            6: 'Floor 6',
+        };
+
+        function getNodeCategory3D(name) {
+            const lower = name.toLowerCase();
+            if (lower.includes('exit') || lower.includes('entrance')) return 'exit';
+            if (lower.includes('stair')) return 'stairs';
+            if (lower.includes('lift')) return 'lift';
+            if (name.startsWith('j') || name.includes('_j')) return 'junction';
+            return 'room';
+        }
+
+        function getNodeFloor3D(posZ) {
+            return Math.round(posZ / 350);
+        }
+
+        // Shared geometries for performance
+        const roomSphereGeo = new THREE.SphereGeometry(0.35, 20, 20);
+        const juncSphereGeo = new THREE.SphereGeometry(0.18, 12, 12);
+        const stairCylGeo   = new THREE.CylinderGeometry(0.42, 0.42, 0.5, 16);
+        const liftCylGeo    = new THREE.CylinderGeometry(0.42, 0.42, 0.5, 16);
+        const exitGeo       = new THREE.CylinderGeometry(0.55, 0.55, 0.25, 16);
+
+        // Track meshes for filtering and interaction
+        const allNodeMeshes = {};
+        const nodeInteractiveList = [];
+        const intraEdgeLines = [];
+        const verticalBridgeMeshes = [];
+        const floorSlabMeshes = [];
+        const floorSlabGroups = [];
+
+        // Floor bounding boxes for floor slab creation
+        const floorBounds = {};
+        for (let fl = 0; fl <= 6; fl++) {
+            floorBounds[fl] = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity, count: 0 };
+        }
+
+        // Calculate global building center
+        let sumX = 0, sumY = 0, nodeCount = 0;
 
         for (const [name, pos] of Object.entries(campusData.nodes)) {
-            const material = pos.z === 0 ? groundMaterial : floor1Material;
-            const sphere = new THREE.Mesh(sphereGeo, material);
-            sphere.position.set(pos.x/scale, pos.z/scale, pos.y/scale); 
-            scene.add(sphere);
+            const fl = getNodeFloor3D(pos.z);
+            const x3d = pos.x / scale;
+            const y3d = pos.z / scale;
+            const z3d = pos.y / scale;
 
-            centerX += pos.x/scale;
-            centerY += pos.y/scale;
-            count++;
+            sumX += x3d;
+            sumY += z3d;
+            nodeCount++;
+
+            if (floorBounds[fl]) {
+                floorBounds[fl].minX = Math.min(floorBounds[fl].minX, x3d);
+                floorBounds[fl].maxX = Math.max(floorBounds[fl].maxX, x3d);
+                floorBounds[fl].minZ = Math.min(floorBounds[fl].minZ, z3d);
+                floorBounds[fl].maxZ = Math.max(floorBounds[fl].maxZ, z3d);
+                floorBounds[fl].count++;
+            }
         }
-        
-        controls.target.set(centerX/count, 5, centerY/count);
+
+        const bldgCenterX = sumX / nodeCount;
+        const bldgCenterZ = sumY / nodeCount;
+        const bldgCenterY = 10.5; // (21.0 max height / 2)
+
+        // Set default camera isometric perspective framing all 7 floors
+        camera.position.set(bldgCenterX + 32, 28, bldgCenterZ + 42);
+        controls.target.set(bldgCenterX, bldgCenterY, bldgCenterZ);
         controls.update();
 
-        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x334155, linewidth: 1 });
-        const bridgeMaterial = new THREE.LineBasicMaterial({ color: 0x059669, linewidth: 2 });
+        // --- 5. RENDER FLOOR SLABS & FLOATING LEVEL BADGES ---
+        function createFloorTextSprite(text, colorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(12, 16, 27, 0.85)';
+            ctx.beginPath();
+            ctx.roundRect(8, 8, 240, 48, 10);
+            ctx.fill();
+            ctx.strokeStyle = colorHex;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 22px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 128, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.85 });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(6, 1.5, 1);
+            return sprite;
+        }
+
+        for (let fl = 0; fl <= 6; fl++) {
+            const b = floorBounds[fl];
+            if (b.count === 0) continue;
+
+            const flY = fl * 3.5;
+            const flColor = FLOOR_COLORS_3D[fl];
+            const width = (b.maxX - b.minX) + 6;
+            const depth = (b.maxZ - b.minZ) + 6;
+            const midX = (b.minX + b.maxX) / 2;
+            const midZ = (b.minZ + b.maxZ) / 2;
+
+            const slabGroup = new THREE.Group();
+            slabGroup.userData = { floor: fl };
+
+            // Translucent floor plane
+            const slabGeo = new THREE.PlaneGeometry(width, depth);
+            const slabMat = new THREE.MeshBasicMaterial({
+                color: flColor,
+                transparent: true,
+                opacity: 0.08,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const slabMesh = new THREE.Mesh(slabGeo, slabMat);
+            slabMesh.rotation.x = -Math.PI / 2;
+            slabMesh.position.set(midX, flY - 0.05, midZ);
+            slabGroup.add(slabMesh);
+            floorSlabMeshes[fl] = slabMat;
+
+            // Thin perimeter outline
+            const edgesGeo = new THREE.EdgesGeometry(slabGeo);
+            const edgesMat = new THREE.LineBasicMaterial({ color: flColor, transparent: true, opacity: 0.25 });
+            const outline = new THREE.LineSegments(edgesGeo, edgesMat);
+            outline.rotation.x = -Math.PI / 2;
+            outline.position.set(midX, flY - 0.05, midZ);
+            slabGroup.add(outline);
+
+            // Floating 3D floor badge
+            const badgeSprite = createFloorTextSprite(`L${fl} • ${FLOOR_NAMES_3D[fl].toUpperCase()}`, `#${flColor.toString(16).padStart(6,'0')}`);
+            badgeSprite.position.set(b.minX - 4, flY + 0.5, midZ);
+            slabGroup.add(badgeSprite);
+
+            scene.add(slabGroup);
+            floorSlabGroups.push(slabGroup);
+        }
+
+        // --- 6. RENDER ALL 452 NODES WITH HIERARCHICAL STYLING ---
+        for (const [name, pos] of Object.entries(campusData.nodes)) {
+            const fl = getNodeFloor3D(pos.z);
+            const cat = getNodeCategory3D(name);
+            const flColor = FLOOR_COLORS_3D[fl] || 0xffffff;
+
+            let nodeMesh;
+            if (cat === 'exit') {
+                // Exit: Emerald double-ring cylinder
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x10b981,
+                    emissive: 0x059669,
+                    emissiveIntensity: 0.8,
+                    roughness: 0.2,
+                    metalness: 0.3
+                });
+                nodeMesh = new THREE.Mesh(exitGeo, mat);
+            } else if (cat === 'stairs') {
+                // Stairs: Golden vertical capsule
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0xf59e0b,
+                    emissive: 0xd97706,
+                    emissiveIntensity: 0.6,
+                    roughness: 0.3
+                });
+                nodeMesh = new THREE.Mesh(stairCylGeo, mat);
+            } else if (cat === 'lift') {
+                // Lift: Cyan vertical capsule
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x06b6d4,
+                    emissive: 0x0891b2,
+                    emissiveIntensity: 0.6,
+                    roughness: 0.3
+                });
+                nodeMesh = new THREE.Mesh(liftCylGeo, mat);
+            } else if (cat === 'junction') {
+                // Junction: Subtle waypoint
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x94a3b8,
+                    roughness: 0.6,
+                    metalness: 0.1
+                });
+                nodeMesh = new THREE.Mesh(juncSphereGeo, mat);
+            } else {
+                // Room: Floor-tinted sphere
+                const mat = new THREE.MeshStandardMaterial({
+                    color: flColor,
+                    roughness: 0.35,
+                    metalness: 0.25
+                });
+                nodeMesh = new THREE.Mesh(roomSphereGeo, mat);
+            }
+
+            nodeMesh.position.set(pos.x / scale, pos.z / scale, pos.y / scale);
+            nodeMesh.userData = {
+                id: name,
+                floor: fl,
+                category: cat,
+                originalY: pos.z / scale,
+                baseColor: flColor
+            };
+
+            scene.add(nodeMesh);
+            allNodeMeshes[name] = nodeMesh;
+            nodeInteractiveList.push(nodeMesh);
+        }
+
+        // --- 7. RENDER INTRA-FLOOR EDGES & VERTICAL CONNECTION COLUMNS ---
+        const edgeBaseMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
 
         campusData.edges.forEach(edge => {
             const start = campusData.nodes[edge[0]];
             const end = campusData.nodes[edge[1]];
             
-            if(start && end) {
-                const points = [];
-                points.push(new THREE.Vector3(start.x/scale, start.z/scale, start.y/scale));
-                points.push(new THREE.Vector3(end.x/scale, end.z/scale, end.y/scale));
-                
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const isBridge = start.z !== end.z;
-                const line = new THREE.Line(geometry, isBridge ? bridgeMaterial : edgeMaterial);
+            if (!start || !end) return;
+
+            const isBridge = (start.z !== end.z);
+            const p1 = new THREE.Vector3(start.x / scale, start.z / scale, start.y / scale);
+            const p2 = new THREE.Vector3(end.x / scale, end.z / scale, end.y / scale);
+
+            if (isBridge) {
+                // Vertical Stair / Lift Shaft Column
+                const isStair = edge[0].toLowerCase().includes('stair') || edge[1].toLowerCase().includes('stair');
+                const bridgeColor = isStair ? 0xf59e0b : 0x06b6d4;
+                const emissiveCol = isStair ? 0xb45309 : 0x0e7490;
+
+                const curve = new THREE.LineCurve3(p1, p2);
+                const tubeGeo = new THREE.TubeGeometry(curve, 8, 0.1, 8, false);
+                const tubeMat = new THREE.MeshStandardMaterial({
+                    color: bridgeColor,
+                    emissive: emissiveCol,
+                    emissiveIntensity: 0.6,
+                    transparent: true,
+                    opacity: 0.85
+                });
+                const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+                tubeMesh.userData = {
+                    fromFloor: getNodeFloor3D(start.z),
+                    toFloor: getNodeFloor3D(end.z),
+                    type: isStair ? 'stair_bridge' : 'lift_bridge'
+                };
+                scene.add(tubeMesh);
+                verticalBridgeMeshes.push(tubeMesh);
+            } else {
+                // Intra-floor corridor connection
+                const geom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+                const lineMat = edgeBaseMat.clone();
+                const line = new THREE.Line(geom, lineMat);
+                const fl = getNodeFloor3D(start.z);
+                intraEdgeLines.push({ line: line, userData: { floor: fl } });
                 scene.add(line);
             }
         });
 
-        // --- 5. PATHFINDING LOGIC (DIJKSTRA) ---
+        // --- 8. INTERACTIVE FLOOR FILTERING (MODE 1 & MODE 2) ---
+        let currentFloorFilter = 'all';
+
+        function setFloorFilter(filter) {
+            currentFloorFilter = filter;
+
+            // Update UI buttons
+            document.querySelectorAll('.floor-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.floor === String(filter));
+            });
+
+            const isAll = (filter === 'all');
+            const targetFl = isAll ? null : parseInt(filter);
+
+            // Filter Node Meshes
+            for (const [name, mesh] of Object.entries(allNodeMeshes)) {
+                const nodeFl = mesh.userData.floor;
+                if (isAll || nodeFl === targetFl) {
+                    mesh.visible = true;
+                    mesh.material.transparent = false;
+                    mesh.material.opacity = 1.0;
+                } else {
+                    // Mode 2: Faded ghost representation for out-of-focus floors
+                    mesh.visible = true;
+                    mesh.material.transparent = true;
+                    mesh.material.opacity = 0.08;
+                }
+            }
+
+            // Filter Intra-floor Edges
+            intraEdgeLines.forEach(item => {
+                if (isAll || item.userData.floor === targetFl) {
+                    item.line.material.opacity = isAll ? 0.35 : 0.65;
+                } else {
+                    item.line.material.opacity = 0.03;
+                }
+            });
+
+            // Filter Vertical Connections
+            verticalBridgeMeshes.forEach(bridge => {
+                if (isAll) {
+                    bridge.material.opacity = 0.85;
+                } else {
+                    const touchesFloor = (bridge.userData.fromFloor === targetFl || bridge.userData.toFloor === targetFl);
+                    bridge.material.opacity = touchesFloor ? 0.95 : 0.06;
+                }
+            });
+
+            // Filter Floor Slab visuals
+            floorSlabGroups.forEach(grp => {
+                const fl = grp.userData.floor;
+                if (isAll || fl === targetFl) {
+                    grp.visible = true;
+                    if (floorSlabMeshes[fl]) {
+                        floorSlabMeshes[fl].opacity = (fl === targetFl && !isAll) ? 0.25 : 0.08;
+                    }
+                } else {
+                    grp.visible = false;
+                }
+            });
+
+            // Smooth Camera Focus
+            if (isAll) {
+                animate3DCamera(bldgCenterX + 32, 28, bldgCenterZ + 42, bldgCenterX, bldgCenterY, bldgCenterZ);
+            } else {
+                const flY = targetFl * 3.5;
+                animate3DCamera(bldgCenterX + 22, flY + 16, bldgCenterZ + 28, bldgCenterX, flY, bldgCenterZ);
+            }
+        }
+
+        function reset3DCamera() {
+            setFloorFilter('all');
+        }
+
+        function animate3DCamera(camX, camY, camZ, targetX, targetY, targetZ, duration = 650) {
+            const startCam = camera.position.clone();
+            const startTarget = controls.target.clone();
+            const endCam = new THREE.Vector3(camX, camY, camZ);
+            const endTarget = new THREE.Vector3(targetX, targetY, targetZ);
+            const startT = performance.now();
+
+            function step(now) {
+                const progress = Math.min(1.0, (now - startT) / duration);
+                const ease = 0.5 - Math.cos(progress * Math.PI) / 2;
+                camera.position.lerpVectors(startCam, endCam, ease);
+                controls.target.lerpVectors(startTarget, endTarget, ease);
+                controls.update();
+                if (progress < 1.0) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // --- 9. INTERACTIVE RAYCASTING HOVER TOOLTIP ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltipEl = document.getElementById('nodeTooltip');
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(nodeInteractiveList);
+
+            if (hits.length > 0) {
+                const hit = hits[0].object;
+                const d = hit.userData;
+                if (d && d.id) {
+                    const flLabel = FLOOR_NAMES_3D[d.floor] || `Floor ${d.floor}`;
+                    tooltipEl.innerHTML = `<div style="font-weight:700; color:#fff;">${d.id}</div><div style="font-size:0.85em; color:#38bdf8; margin-top:2px;">${flLabel} • ${d.category.toUpperCase()}</div>`;
+                    tooltipEl.style.left = (event.clientX + 14) + 'px';
+                    tooltipEl.style.top = (event.clientY + 14) + 'px';
+                    tooltipEl.style.display = 'block';
+                    document.body.style.cursor = 'pointer';
+                    return;
+                }
+            }
+            tooltipEl.style.display = 'none';
+            document.body.style.cursor = 'default';
+        });
+
+        // --- 10. PATHFINDING LOGIC (DIJKSTRA) ---
         function findPath(startNodeId, endNodeId) {
             const nodes = campusData.nodes;
             const edges = campusData.edges;
@@ -1067,7 +1512,7 @@
             const crowdIntens   = parseFloat(document.getElementById('mlCrowdIntensity').value);
             const crowdRadius   = parseFloat(document.getElementById('mlCrowdRadius').value);
             const mobilityImp   = document.getElementById('mlMobility').checked;
-            const isMultiFloor  = emergencyType === 'accessibility' || emergencyType === 'multifloor_fire';
+            const isMultiFloor  = origin.startsWith('f') || emergencyType === 'accessibility' || emergencyType === 'multifloor_fire';
 
             if (!origin) { alert('Please select an origin node.'); return; }
 
