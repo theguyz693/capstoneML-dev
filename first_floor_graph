@@ -1,0 +1,76 @@
+import matplotlib.pyplot as plt
+from PIL import Image
+import math
+
+# --- 1. YOUR SAVED FIRST FLOOR DATA ---
+# --- 1. IMPORT YOUR DATA ---
+# This pulls your nodes and existing edges straight from your new file!
+from first_floor_data import nodes_f1_raw, edges_f1
+
+# Rename it locally so we don't have to change the rest of your code
+nodes_f1 = nodes_f1_raw
+
+temp_node = None 
+
+# --- 2. SETUP IMAGE ---
+img = Image.open('first_floor_hd.jpg') 
+fig, ax = plt.subplots(figsize=(20, 12))
+mng = plt.get_current_fig_manager()
+try: mng.window.state('zoomed') 
+except: pass
+ax.imshow(img)
+
+# --- 3. DRAW EXISTING NODES AND EDGES (The "Reflection" Fix) ---
+# Draw the dots
+for name, (nx, ny) in nodes_f1.items():
+    ax.plot(nx, ny, 'ro', markersize=4)
+    ax.text(nx, ny, f" {name}", color='red', fontsize=5, alpha=0.7)
+
+# Draw the lines you already pasted
+for start_node, end_node in edges_f1:
+    if start_node in nodes_f1 and end_node in nodes_f1:
+        x_vals = [nodes_f1[start_node][0], nodes_f1[end_node][0]]
+        y_vals = [nodes_f1[start_node][1], nodes_f1[end_node][1]]
+        ax.plot(x_vals, y_vals, 'b-', linewidth=2, alpha=0.6)
+
+# --- 4. CLICK LOGIC ---
+def find_nearest_node(x, y):
+    min_dist = 100 
+    closest_name = None
+    for name, (nx, ny) in nodes_f1.items():
+        dist = math.sqrt((x-nx)**2 + (y-ny)**2)
+        if dist < min_dist:
+            min_dist = dist
+            closest_name = name
+    return closest_name
+
+def onclick(event):
+    global temp_node
+    if event.xdata is not None and event.ydata is not None:
+        clicked_node = find_nearest_node(event.xdata, event.ydata)
+        if clicked_node:
+            if temp_node is None:
+                temp_node = clicked_node
+                ax.plot(nodes_f1[temp_node][0], nodes_f1[temp_node][1], 'yo', markersize=10) 
+                plt.draw()
+            else:
+                if temp_node != clicked_node:
+                    edges_f1.append((temp_node, clicked_node))
+                    x_vals = [nodes_f1[temp_node][0], nodes_f1[clicked_node][0]]
+                    y_vals = [nodes_f1[temp_node][1], nodes_f1[clicked_node][1]]
+                    ax.plot(x_vals, y_vals, 'b-', linewidth=2)
+                    print(f"Connected: {temp_node} <--> {clicked_node}")
+                temp_node = None
+                plt.draw()
+
+cid = fig.canvas.mpl_connect('button_press_event', onclick)
+plt.title("F1 EDGE CONNECTOR: Pasted edges should now be visible!", fontsize=15)
+plt.axis('off')
+plt.show()
+
+# 5. FINAL OUTPUT
+print("\nCOPY THESE EDGES:")
+print("edges_f1 = [")
+for edge in edges_f1:
+    print(f"    {edge},")
+print("]")

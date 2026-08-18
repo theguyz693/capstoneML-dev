@@ -1,0 +1,30 @@
+{
+    "model_type": "RandomForestRegressor",
+    "feature_cols": [
+        "distance",
+        "hazard_level",
+        "crowd_density",
+        "accessibility"
+    ],
+    "target_col": "edge_cost",
+    "n_samples": 12000,
+    "hyperparameters": {
+        "n_estimators": 150,
+        "max_depth": 18,
+        "min_samples_split": 4,
+        "min_samples_leaf": 2
+    },
+    "metrics": {
+        "train_r2": 0.9918919448732433,
+        "test_r2": 0.9825205393638687,
+        "test_mae": 922.0401031891722,
+        "test_rmse": 4449.462979153006,
+        "test_mape_percent": 4.7329884376638764
+    },
+    "feature_importances": {
+        "distance": 0.14659217108008177,
+        "hazard_level": 0.5281275700144553,
+        "crowd_density": 0.1625874735098763,
+        "accessibility": 0.16269278539558668
+    }
+}

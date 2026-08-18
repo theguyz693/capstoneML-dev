@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Campus Map</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #0d1424; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            color: #060f18;
+        }
+
+        #canvas-container { 
+            width: 100vw; 
+            height: 100vh; 
+        }
+
+        /* Dark Glassmorphism Panel */
+        #ui { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            background: rgba(12, 16, 27, 0.7); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px);
+            padding: 24px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 320px;
+            width: 100%;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        /* Make text inside the UI look good on dark */
+        #ui h3 { color: #fff; margin: 0 0 15px 0; font-weight: 600; letter-spacing: 0.5px;}
+        #ui h4 { color: #cbd5e1; margin: 0 0 10px 0; font-weight: 500; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px;}
+        #ui p { color: #cbd5e1; }
+
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            outline: none;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        input[type="text"]::placeholder { color: #64748b; }
+        input[type="text"]:focus { border-color: #3b82f6; background: rgba(0, 0, 0, 0.5); }
+
+        button { 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            border: none; 
+            border-radius: 8px; 
+            padding: 10px 14px; 
+            font-weight: 600; 
+            font-size: 0.9em;
+        }
+        
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+            filter: brightness(1.1); 
+        }
+
+        .nav-btn { background-color: #3b82f6; color: white; width: 100%; margin-top: 10px; }
+        .emergency-btn { background-color: #ef4444; color: white; }
+        .close-btn { background: none; color: #64748b; font-size: 18px; padding: 0; }
+        .close-btn:hover { color: #f8fafc; transform: none; box-shadow: none; }     
+    </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="campus_data.js"></script>
+</head>
+<body>
+    <button id="showMenuBtn" onclick="toggleUI()" style="display: none;">☰ Open Controls</button>
+
+    <div id="ui">
+        <div class="ui-header">
+            <h3 style="margin: 0;">Campus Navigation</h3>
+            <button class="close-btn" onclick="toggleUI()">✖</button>
+        </div>
+        
+        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+            <input type="text" id="startInput" placeholder="Start (e.g. j1)" style="flex: 1;">
+            <input type="text" id="endInput" placeholder="End (e.g. f1_lab)" style="flex: 1;">
+        </div>
+        <button class="nav-btn" onclick="runNavigation()">Navigate</button>
+        
+        <hr style="margin: 15px 0; border: 0; border-top: 1px solid rgba(0,0,0,0.1);">
+        
+        <h4 style="margin: 0 0 10px 0;">🚨 Emergency Routing</h4>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="emergencyStart" placeholder="Your Location" style="flex: 1;">
+            <button onclick="runEmergency()" class="emergency-btn">SHOW EXITS</button>
+        </div>
+        
+        <p id="pathInfo" style="font-size: 0.9em; margin-top: 15px; word-wrap: break-word;"></p>
+    </div>
+    
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 1. UI TOGGLE ---
+        function toggleUI() {
+            const uiPanel = document.getElementById('ui');
+            const showBtn = document.getElementById('showMenuBtn');
+            
+            if (uiPanel.classList.contains('hidden')) {
+                uiPanel.classList.remove('hidden');
+                showBtn.style.display = 'none';
+            } else {
+                uiPanel.classList.add('hidden');
+                showBtn.style.display = 'block';
+            }
+        }
+
+        // --- 2. SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f8fafc'); 
+        scene.fog = new THREE.FogExp2('#0f172a', 0.015); 
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+        const scale = 100;
+        camera.position.set(30, 40, 50);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio); 
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05;
+
+        // --- 3. LIGHTING ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(20, 40, 20);
+        scene.add(dirLight);
+
+        const blueFillLight = new THREE.DirectionalLight(0x3b82f6, 0.3); 
+        blueFillLight.position.set(-20, 0, -20);
+        scene.add(blueFillLight);
+
+        // --- 4. DRAWING GRAPH (NODES & EDGES) ---
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xff4d4d, roughness: 0.4, metalness: 0.2 });
+        const floor1Material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4, metalness: 0.2 });
+        const sphereGeo = new THREE.SphereGeometry(0.35, 32, 32);
+
+        let centerX = 0, centerY = 0, count = 0;
+
+        for (const [name, pos] of Object.entries(campusData.nodes)) {
+            const material = pos.z === 0 ? groundMaterial : floor1Material;
+            const sphere = new THREE.Mesh(sphereGeo, material);
+            sphere.position.set(pos.x/scale, pos.z/scale, pos.y/scale); 
+            scene.add(sphere);
+
+            centerX += pos.x/scale;
+            centerY += pos.y/scale;
+            count++;
+        }
+        
+        controls.target.set(centerX/count, 5, centerY/count);
+        controls.update();
+
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x334155, linewidth: 1 });
+        const bridgeMaterial = new THREE.LineBasicMaterial({ color: 0x059669, linewidth: 2 });
+
+        campusData.edges.forEach(edge => {
+            const start = campusData.nodes[edge[0]];
+            const end = campusData.nodes[edge[1]];
+            
+            if(start && end) {
+                const points = [];
+                points.push(new THREE.Vector3(start.x/scale, start.z/scale, start.y/scale));
+                points.push(new THREE.Vector3(end.x/scale, end.z/scale, end.y/scale));
+                
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const isBridge = start.z !== end.z;
+                const line = new THREE.Line(geometry, isBridge ? bridgeMaterial : edgeMaterial);
+                scene.add(line);
+            }
+        });
+
+        // --- 5. PATHFINDING LOGIC (DIJKSTRA) ---
+        function findPath(startNodeId, endNodeId) {
+            const nodes = campusData.nodes;
+            const edges = campusData.edges;
+            const graph = {};
+            
+            for (const id in nodes) graph[id] = {};
+            
+            edges.forEach(([u, v]) => {
+                if (!nodes[u] || !nodes[v]) return;
+                const dx = nodes[u].x - nodes[v].x;
+                const dy = nodes[u].y - nodes[v].y;
+                const dz = nodes[u].z - nodes[v].z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                
+                graph[u][v] = dist;
+                graph[v][u] = dist; 
+            });
+
+            let distances = {};
+            let prev = {};
+            let pq = new Set(Object.keys(nodes));
+
+            for (let id in nodes) {
+                distances[id] = Infinity;
+                prev[id] = null;
+            }
+            distances[startNodeId] = 0;
+
+            while (pq.size > 0) {
+                let curr = [...pq].reduce((a, b) => distances[a] < distances[b] ? a : b);
+                pq.delete(curr);
+
+                if (curr === endNodeId) break;
+
+                for (let neighbor in graph[curr]) {
+                    let alt = distances[curr] + graph[curr][neighbor];
+                    if (alt < distances[neighbor]) {
+                        distances[neighbor] = alt;
+                        prev[neighbor] = curr;
+                    }
+                }
+            }
+
+            let path = [];
+            let u = endNodeId;
+            while (u !== null) {
+                path.unshift(u);
+                u = prev[u];
+            }
+            return path;
+        }
+
+        // --- 6. STANDARD NAVIGATION VISUALIZATION ---
+        let currentPathMesh = null;
+        let pathArrows = [];      
+        let pathCurve = null;     
+
+        function highlightPath(path) {
+            if (currentPathMesh) {
+                scene.remove(currentPathMesh);
+                currentPathMesh.geometry.dispose();
+                currentPathMesh.material.dispose();
+            }
+            pathArrows.forEach(arrow => {
+                scene.remove(arrow);
+                arrow.geometry.dispose();
+                arrow.material.dispose();
+            });
+            pathArrows = [];
+
+            const points = path.map(id => {
+                const node = campusData.nodes[id];
+                return new THREE.Vector3(node.x / 100, node.z / 100, node.y / 100);
+            });
+
+            pathCurve = new THREE.CatmullRomCurve3(points);
+            const tubeGeometry = new THREE.TubeGeometry(pathCurve, 64, 0.15, 8, false);
+            
+            const pathMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0xffff00, 
+                emissive: 0xaaaa00,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            currentPathMesh = new THREE.Mesh(tubeGeometry, pathMaterial);
+            scene.add(currentPathMesh);
+
+            const arrowCount = Math.max(2, Math.floor(path.length * 0.7)); 
+            const coneGeo = new THREE.ConeGeometry(0.4, 1.2, 16);
+            coneGeo.rotateX(Math.PI / 2); 
+            
+            const coneMat = new THREE.MeshLambertMaterial({
+                color: 0x000000,
+                emissive: 0xffffff, 
+                depthTest: false    
+            });
+
+            for (let i = 0; i < arrowCount; i++) {
+                const arrow = new THREE.Mesh(coneGeo, coneMat);
+                arrow.renderOrder = 2; 
+                arrow.userData.t = i / arrowCount; 
+                scene.add(arrow);
+                pathArrows.push(arrow);
+            }
+        }
+
+        function runNavigation() {
+            const start = document.getElementById('startInput').value;
+            const end = document.getElementById('endInput').value;
+            
+            if (campusData.nodes[start] && campusData.nodes[end]) {
+                const path = findPath(start, end);
+                highlightPath(path);
+                document.getElementById('pathInfo').innerText = "Path: " + path.join(" → ");
+            } else {
+                alert("Invalid node names! Check your campus_data.js");
+            }
+        }
+
+        // --- 7. EMERGENCY ROUTING VISUALIZATION ---
+        let currentEmergencyMeshes = [];
+        const exitNodes = ['east entrance/exit', 'north entrance/exit', 'east main entrance', 'north main entrance'];
+
+        function runEmergency() {
+            const start = document.getElementById('emergencyStart').value;
+            
+            if (!campusData.nodes[start]) {
+                alert("Invalid starting location!");
+                return;
+            }
+
+            const nodes = campusData.nodes;
+            const edges = campusData.edges;
+            const graph = {};
+            for (const id in nodes) graph[id] = {};
+            
+            edges.forEach(([u, v]) => {
+                if (!nodes[u] || !nodes[v]) return;
+                const dx = nodes[u].x - nodes[v].x, dy = nodes[u].y - nodes[v].y, dz = nodes[u].z - nodes[v].z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                graph[u][v] = dist;
+                graph[v][u] = dist;
+            });
+
+            let distances = {}, prev = {};
+            let pq = new Set(Object.keys(nodes));
+            for (let id in nodes) { distances[id] = Infinity; prev[id] = null; }
+            distances[start] = 0;
+
+            while (pq.size > 0) {
+                let curr = [...pq].reduce((a, b) => distances[a] < distances[b] ? a : b);
+                pq.delete(curr);
+                if (distances[curr] === Infinity) break;
+
+                for (let neighbor in graph[curr]) {
+                    let alt = distances[curr] + graph[curr][neighbor];
+                    if (alt < distances[neighbor]) {
+                        distances[neighbor] = alt;
+                        prev[neighbor] = curr;
+                    }
+                }
+            }
+
+            let allEscapePaths = [];
+            exitNodes.forEach(exitId => {
+                if (distances[exitId] !== Infinity && prev[exitId]) {
+                    let path = [];
+                    let u = exitId;
+                    while (u !== null) {
+                        path.unshift(u);
+                        u = prev[u];
+                    }
+                    allEscapePaths.push({ id: exitId, path: path, dist: distances[exitId] });
+                }
+            });
+
+            allEscapePaths.sort((a, b) => a.dist - b.dist);
+            drawEmergencyPaths(allEscapePaths);
+            
+            document.getElementById('pathInfo').innerHTML = `<span style="color:#2ca02c; font-weight:bold;">Primary Exit (Green): ${allEscapePaths[0].id}</span><br><span style="color:#ff4d4d; font-size: 0.9em;">Alternative Exits (Red)</span>`;
+        }
+
+        function drawEmergencyPaths(escapePaths) {
+            if (currentPathMesh) { scene.remove(currentPathMesh); }
+            currentEmergencyMeshes.forEach(mesh => scene.remove(mesh));
+            currentEmergencyMeshes = [];
+
+            const primaryMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00, emissive: 0x00aa00, transparent: true, opacity: 0.9 });
+            const secondaryMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000, emissive: 0xaa0000, transparent: true, opacity: 0.5 });
+
+            escapePaths.forEach((escapeRoute, index) => {
+                const points = escapeRoute.path.map(id => {
+                    const node = campusData.nodes[id];
+                    return new THREE.Vector3(node.x/100, node.z/100, node.y/100);
+                });
+                
+                const curve = new THREE.CatmullRomCurve3(points);
+                const tubeThickness = (index === 0) ? 0.2 : 0.12; 
+                const tubeGeo = new THREE.TubeGeometry(curve, 64, tubeThickness, 8, false);
+                const material = (index === 0) ? primaryMaterial : secondaryMaterial;
+                
+                const mesh = new THREE.Mesh(tubeGeo, material);
+                scene.add(mesh);
+                currentEmergencyMeshes.push(mesh);
+            });
+        }
+
+        // --- 8. ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); 
+            
+            if (currentPathMesh) {
+                currentPathMesh.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.005) * 0.5;
+            }
+
+            if (pathCurve && pathArrows.length > 0) {
+                const speed = 0.0015; 
+                
+                pathArrows.forEach(arrow => {
+                    arrow.userData.t += speed;
+                    if (arrow.userData.t > 1) {
+                        arrow.userData.t = 0; 
+                    }
+
+                    const pt = pathCurve.getPoint(arrow.userData.t);
+                    const tangent = pathCurve.getTangent(arrow.userData.t);
+
+                    arrow.position.copy(pt);
+                    arrow.position.y += 0.3; 
+
+                    const lookAtPt = pt.clone().add(tangent);
+                    arrow.lookAt(lookAtPt);
+                });
+            }
+
+            if (typeof currentEmergencyMeshes !== 'undefined' && currentEmergencyMeshes.length > 0) {
+                const sirenPulse = 0.6 + Math.sin(Date.now() * 0.015) * 0.6; 
+                currentEmergencyMeshes.forEach(mesh => {
+                    mesh.material.emissiveIntensity = sirenPulse;
+                });
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

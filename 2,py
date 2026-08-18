@@ -1,0 +1,50 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+from PIL import Image
+
+# 1. Initialize the Graph
+G = nx.Graph()
+
+# 2. Define Nodes by Category
+# Update these coordinates based on your 'floor_plan_hd.jpg' clicks
+rooms = {
+    # Seminar Halls (Large spaces)
+    "Seminar_Hall_G23": (250, 350), 
+    "Seminar_Hall_G18": (680, 850),
+    
+    # Labs (Computer, Electronics, etc.)
+    "Computer_Lab_G22": (400, 330),
+    "Computer_Lab_116": (650, 650),
+    "Electronics_Lab_G11": (450, 420),
+    
+    # Offices & Administration
+    "Principal_Office": (750, 500),
+    "Placement_Centre": (550, 380),
+    "General_Office": (680, 550),
+    
+    # Classrooms
+    "Classroom_G26": (320, 450),
+    "Classroom_G24": (320, 550),
+    "Classroom_G16": (520, 780)
+}
+
+# 3. Add nodes to the graph with 'type' metadata for better visualization
+for name, pos in rooms.items():
+    G.add_node(name, pos=pos)
+
+# 4. Visualization
+img = Image.open('ground floor.jpg')
+fig, ax = plt.subplots(figsize=(16, 12))
+ax.imshow(img)
+
+pos = nx.get_node_attributes(G, 'pos')
+
+# Draw the nodes as large markers
+nx.draw_networkx_nodes(G, pos, ax=ax, node_size=50, node_color='blue', alpha=0.8)
+
+# Add labels with a slight offset so they don't cover the room name on the blueprint
+nx.draw_networkx_labels(G, pos, ax=ax, font_size=8, font_weight='bold', verticalalignment='bottom')
+
+plt.title("Room Identification: Seminar Halls, Labs, Offices, and Classrooms")
+plt.axis('off')
+plt.show()
