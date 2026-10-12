@@ -1,0 +1,5 @@
+# evac engine outputs and caches
+results/
+evac/__pycache__/
+tests/__pycache__/
+evac_session1.tgz

@@ -1,0 +1,25 @@
+{
+  "baseline_150_no_fire": {
+    "description": "150 people spread over all floors, no fire",
+    "n_agents": 150, "spawn": "building", "step_free_frac": 0.05, "fires": []
+  },
+  "fire_j19_150": {
+    "description": "Fire at ground-floor j19 (near stairs 1/lifts 3-4), 150 people",
+    "n_agents": 150, "spawn": "building", "step_free_frac": 0.05,
+    "fires": [{"node": "j19", "radius": 780, "intensity": 1.0}]
+  },
+  "fire_j6_east_exit_150": {
+    "description": "Fire at j6 next to the east exit, 150 people",
+    "n_agents": 150, "spawn": "building", "step_free_frac": 0.05,
+    "fires": [{"node": "j6", "radius": 400, "intensity": 1.0}]
+  },
+  "lecture_hall_f1_120": {
+    "description": "120 people leaving one first-floor seminar hall, no fire",
+    "n_agents": 120, "spawn": "single", "origin": "f1_sem hall 1", "fires": []
+  },
+  "crowd_250_fire_j19": {
+    "description": "250 people, fire at j19 - the heavy-load case",
+    "n_agents": 250, "spawn": "building", "step_free_frac": 0.05,
+    "fires": [{"node": "j19", "radius": 780, "intensity": 1.0}]
+  }
+}
