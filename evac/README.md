@@ -52,9 +52,10 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 4. Step-free users never use stairs; if no step-free route exists they are counted as
    `needs_assistance` (wait at a refuge for assisted evacuation) — never sent down stairs.
 
-## Known data issue
-`electrical room 2` has no edge in `campus_data.py`, so it cannot reach any exit.
-It is excluded from spawning until its connection is added.
+## Data fix
+`electrical room 2` had no edge in `campus_data.py` (it could not reach any exit). It is now linked to
+its nearest corridor junction, `j19` (~5 m), in both `campus_data.py` and `campus_data.js`.
+The graph is 452 nodes / 637 edges.
 
 ## Assumptions
 All values in `config.py` are engineering assumptions (SFPE flow rates, Weidmann

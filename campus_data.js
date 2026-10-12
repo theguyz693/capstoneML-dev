@@ -2687,6 +2687,10 @@ const campusData = {
             "j5"
         ],
         [
+            "electrical room 2",
+            "j19"
+        ],
+        [
             "stairs 1",
             "f1_stairs 1"
         ],

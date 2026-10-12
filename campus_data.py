@@ -32,7 +32,8 @@ edges_g = [
     ('staff room 4', 'j15'), ('staff room 4', 'j10'), ('staff room 3', 'j10'),
     ('staff room 16', 'j9'), ('staff room 17', 'j9'), ('staff room 16', 'j10'),
     ('staff room 17', 'j10'), ('staff room 18', 'j9'), ('staff room 19', 'j9'),
-    ('staff room 19', 'j8'), ('staff room 18', 'j8'), ('electrical room 1', 'j5')
+    ('staff room 19', 'j8'), ('staff room 18', 'j8'), ('electrical room 1', 'j5'),
+    ('electrical room 2', 'j19')  # was unconnected; linked to nearest corridor junction
 ]
 
 # 2. FIRST FLOOR DATA

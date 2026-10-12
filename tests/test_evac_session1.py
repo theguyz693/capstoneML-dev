@@ -17,7 +17,7 @@ G0 = load_campus()
 
 
 def test_graph_size():
-    assert G0.number_of_nodes() == 452 and G0.number_of_edges() == 636
+    assert G0.number_of_nodes() == 452 and G0.number_of_edges() == 637  # 636 + electrical room 2 link
     assert len(exits(G0)) == 4
 
 
@@ -72,8 +72,8 @@ def test_never_routed_through_impassable_edge():
             assert all(G.edges[u, v]["hazard"] < 0.92 for u, v in zip(p, p[1:]))
 
 
-def test_known_isolated_node_is_reported():
-    assert unreachable_nodes(G0) == ["electrical room 2"]
+def test_every_node_can_reach_an_exit():
+    assert unreachable_nodes(G0) == []
 
 
 if __name__ == "__main__":
