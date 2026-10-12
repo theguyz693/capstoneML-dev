@@ -69,6 +69,14 @@ LIFTS_ONLY_FOR_STEP_FREE = True
 REROUTE_INTERVAL_S = 5.0
 REACTIVE_QUEUE_THRESHOLD = 8
 
+# ---------------------------------------------------------------- capacity-aware planning
+SLOT_S = 4.0                  # capacity booking slot length (s): an edge admits flow_cap*SLOT_S per slot
+REPLAN_S = 5.0                # 'lookahead' re-plans every 5 s
+HORIZON_S = 300.0             # bookings predicted this far ahead (s). Short horizons (<=120 s) performed WORSE than no planning in tests.
+SWITCH_GAIN = 0.15            # switch route only if predicted >= 15% faster (anti-oscillation)
+HAZARD_DETOUR_PENALTY_S = 300.0  # planner adds this per edge with hazard >= HAZARD_EXPOSURE, so it only
+                                 # trades safety for speed when waiting would exceed ~5 min
+
 # ---------------------------------------------------------------- simulation
 DT = 0.5                      # seconds per simulation step
 MAX_TIME_S = 1800.0           # stop after 30 minutes of simulated time

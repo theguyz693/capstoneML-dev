@@ -115,7 +115,7 @@ def congestion_route_table(G, fire_active, step_free, queue_count, occupancy):
     The search runs outward from the exits, so when networkx relaxes u -> v the
     evacuee actually walks v -> u and queues at v.
     """
-    from .simulator import weidmann_speed_factor
+    from .physics import weidmann_speed_factor
 
     ex = [e for e in exits(G) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE]
     if not ex:

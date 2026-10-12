@@ -27,6 +27,9 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `runner.py` | Scenarios × methods × seeds → CSV. Seeds are paired across methods. |
 | `scenarios.json` | Scenario definitions. |
 | `verification.py` | Simulator sanity tests (free walk, door flow vs width, stairs, speed–density). |
+| `planner.py` | Capacity booking (CCRP) and rolling-horizon re-planning with anti-oscillation rules. |
+| `optimum.py` | Theoretical lower bound via max-flow on a time-expanded network. |
+| `physics.py` | Speed–density relation and each edge's sustainable flow (used by simulator and planner). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.
@@ -38,6 +41,9 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `safe_shortest` | Travel time × hazard penalty (what the current system does). |
 | `ml` | Existing Random Forest edge costs. |
 | `reactive` | Starts as `safe_shortest`; every 5 s reroutes people whose route crosses a visible queue (≥ 8 people). No prediction. |
+| `ccrp` | **Capacity booking (main contribution).** Plans everyone once, in order of readiness; each person takes the earliest-arrival route given door/stair capacity already booked by others (Capacity Constrained Route Planner, Lu et al. 2005). |
+| `lookahead` | **Rolling-horizon re-planning (main contribution).** Re-books capacity every 5 s from where people really are, predicting 300 s ahead. Switches someone only if ≥ 15% faster, never by walking back. |
+| `optimum` | **Theoretical best** last-out time (quickest flow on a time-expanded network). A lower bound — not a method anyone can follow. ~20–40 s to compute. |
 
 ## Hard safety rules (applied before any cost)
 1. Edges with hazard ≥ 0.92 are removed.
@@ -53,3 +59,11 @@ It is excluded from spawning until its connection is added.
 ## Assumptions
 All values in `config.py` are engineering assumptions (SFPE flow rates, Weidmann
 speed–density relation), not measurements of this building.
+
+## Findings so far (preliminary, see `docs/`)
+- Smarter routing only matters when crowds are concentrated (a full hall or floor). Spread over 7 floors, all methods tie.
+- Reactive rerouting helps but oscillates: ~1,000 route changes for 120 people in the seminar-hall case.
+- Capacity booking cuts last-out time by ~35–40% in concentrated scenarios with almost no route changes.
+- **A short prediction horizon is worse than no prediction** (30–60 s horizons lost to plain routing); ≥ 300 s works.
+- Stairs are the true bottleneck: under the speed–density model a 1.2 m stair sustains ~0.7 persons/s, about half
+  its nominal door-style flow. The planner must use this sustainable capacity or it overbooks stairs.

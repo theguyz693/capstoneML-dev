@@ -9,6 +9,7 @@ stay consistent. On top of that, every node gets a `kind` and every edge gets:
   length_m     walking length in metres
   width_m      effective width
   flow_cap     max persons per second that can ENTER the edge
+  eff_cap      sustainable persons/second (min of flow_cap and the speed-density limit)
   jam_cap      max persons that fit on the edge at jam density
   free_speed   m/s at free flow
   vertical     True for edges between floors
@@ -21,6 +22,7 @@ import math
 import networkx as nx
 
 from . import config as C
+from .physics import sustainable_flow
 
 EXIT_NODES = [
     "north entrance/exit",
@@ -75,6 +77,8 @@ def _attach_physics(G):
             length_m=round(length, 2),
             width_m=width,
             flow_cap=C.SPECIFIC_FLOW[et] * width,
+            # what the edge can really sustain: door/stair flow rate OR speed-density limit, whichever is lower
+            eff_cap=min(C.SPECIFIC_FLOW[et] * width, sustainable_flow(width, speed)),
             jam_cap=max(2, int(C.JAM_DENSITY * length * width)),
             free_speed=speed,
         )

@@ -24,16 +24,10 @@ from . import config as C
 from .building import room_nodes
 from .hazard import apply_hazard
 from .routing import route_table, congestion_route_table
+from . import planner
 
 
-def weidmann_speed_factor(density):
-    """Fraction of free speed at a given density (persons/m^2)."""
-    if density <= 0.05:
-        return 1.0
-    if density >= C.JAM_DENSITY:
-        return C.MIN_SPEED_FRACTION
-    f = 1.0 - math.exp(-1.913 * (1.0 / density - 1.0 / C.JAM_DENSITY))
-    return max(C.MIN_SPEED_FRACTION, min(1.0, f))
+from .physics import weidmann_speed_factor  # noqa: E402  (re-exported for older imports)
 
 
 def _ekey(u, v):
@@ -125,7 +119,10 @@ def _reactive_reroute(G, fire_active, queues, occ, waiting_agents):
 
 
 def run(G, scenario, method, seed):
-    """Run one evacuation. Returns (metrics dict, per-agent records)."""
+    """Run one evacuation. Returns (metrics dict, per-agent records).
+    method='optimum' returns the theoretical lower bound instead of a simulation."""
+    if method == "optimum":
+        return _optimum(G, scenario, seed)
     t0 = time.perf_counter()
     rng = random.Random(seed)
     fires = scenario.get("fires", [])
@@ -135,7 +132,7 @@ def run(G, scenario, method, seed):
     agents = spawn(G, scenario, rng)
 
     # routes: one multi-source Dijkstra per (method, step_free) covers every origin
-    base = "safe_shortest" if method == "reactive" else method
+    base = "safe_shortest" if method in ("reactive", "ccrp", "lookahead") else method
     tables = {
         False: route_table(G, base, fire_active, step_free=False),
         True: route_table(G, base, fire_active, step_free=True),
@@ -147,6 +144,17 @@ def run(G, scenario, method, seed):
         else:
             a.path = p
             a.exit = p[-1]
+
+    horizon = float(scenario.get("horizon_s", C.HORIZON_S))
+    switch_gain = float(scenario.get("switch_gain", C.SWITCH_GAIN))
+    if method in ("ccrp", "lookahead"):
+        plannable = [a for a in agents if a.path is not None]
+        plans = planner.plan_all(G, plannable, fire_active,
+                                 horizon=math.inf if method == "ccrp" else horizon)
+        for a in plannable:
+            if a.id in plans:
+                a.path = plans[a.id]
+                a.exit = a.path[-1]
 
     budget = defaultdict(float)
     occ = defaultdict(int)
@@ -164,6 +172,10 @@ def run(G, scenario, method, seed):
         if method == "reactive" and t >= next_reroute:
             next_reroute += C.REROUTE_INTERVAL_S
             _reactive_reroute(G, fire_active, queues, occ, active)
+        elif method == "lookahead" and t >= next_reroute:
+            next_reroute += C.REPLAN_S
+            standing = [a for q in queues.values() for a in q] + list(active)
+            planner.replan(G, agents, moving, standing, t, fire_active, horizon, switch_gain)
         # flow budgets refill
         for u, v, d in G.edges(data=True):
             k = _ekey(u, v)
@@ -281,3 +293,28 @@ def run(G, scenario, method, seed):
         for a in agents
     ]
     return metrics, records
+
+
+def _optimum(G, scenario, seed):
+    """Theoretical best last-out time for the same people (same seed) - see evac/optimum.py."""
+    from .optimum import lower_bound
+    t0 = time.perf_counter()
+    ref, _ = run(G.copy(), scenario, "ccrp", seed)        # an achievable time, used as the search ceiling
+    rng = random.Random(seed)
+    fires = scenario.get("fires", [])
+    apply_hazard(G, fires)
+    agents = spawn(G, scenario, rng)
+    tables = {sf: route_table(G, "safe_shortest", bool(fires), sf) for sf in (False, True)}
+    for a in agents:
+        a.path = tables[a.step_free].get(a.origin)
+    hi = (ref["evac_time_last_s"] or C.MAX_TIME_S) + 10
+    lb = lower_bound(G, agents, bool(fires), hi_s=hi)
+    metrics = {"method": "optimum", "route_changes": 0, "seed": seed, "n_agents": len(agents),
+               "evacuated": sum(a.path is not None for a in agents), "evac_time_last_s": lb,
+               "evac_time_mean_s": None, "evac_time_p95_s": None,
+               "needs_assistance": sum(a.path is None and a.step_free for a in agents),
+               "stranded": sum(a.path is None and not a.step_free for a in agents), "timed_out": 0,
+               "exposed_agents": None, "max_hazard_crossed": None, "max_queue": None,
+               "max_queue_node": None, "peak_density_pm2": None, "exits_used": {},
+               "sim_time_s": None, "compute_s": round(time.perf_counter() - t0, 3)}
+    return metrics, []

@@ -21,5 +21,14 @@
     "description": "250 people, fire at j19 - the heavy-load case",
     "n_agents": 250, "spawn": "building", "step_free_frac": 0.05,
     "fires": [{"node": "j19", "radius": 780, "intensity": 1.0}]
+  },
+  "floor3_full_200": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs",
+    "n_agents": 200, "spawn": "floor", "floor": 3, "step_free_frac": 0.0, "fires": []
+  },
+  "floor3_full_200_fire_stairs1": {
+    "description": "200 people on floor 3, fire at ground stairs 1 - smoke rises up that stair shaft",
+    "n_agents": 200, "spawn": "floor", "floor": 3, "step_free_frac": 0.0,
+    "fires": [{"node": "stairs 1", "radius": 500, "intensity": 1.0}]
   }
 }

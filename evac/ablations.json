@@ -1,0 +1,172 @@
+{
+  "lecture_hall_f1_120__H15": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 15s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 15
+  },
+  "lecture_hall_f1_120__H30": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 30s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 30
+  },
+  "lecture_hall_f1_120__H60": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 60s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 60
+  },
+  "lecture_hall_f1_120__H120": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 120s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 120
+  },
+  "lecture_hall_f1_120__H300": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 300s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 300
+  },
+  "lecture_hall_f1_120__H600": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | horizon 600s",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "horizon_s": 600
+  },
+  "lecture_hall_f1_120__gain0": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | switch gain 0.0",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "switch_gain": 0.0
+  },
+  "lecture_hall_f1_120__gain5": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | switch gain 0.05",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "switch_gain": 0.05
+  },
+  "lecture_hall_f1_120__gain15": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | switch gain 0.15",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "switch_gain": 0.15
+  },
+  "lecture_hall_f1_120__gain30": {
+    "description": "120 people leaving one first-floor seminar hall, no fire | switch gain 0.3",
+    "n_agents": 120,
+    "spawn": "single",
+    "origin": "f1_sem hall 1",
+    "fires": [],
+    "switch_gain": 0.3
+  },
+  "floor3_full_200__H15": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 15s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 15
+  },
+  "floor3_full_200__H30": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 30s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 30
+  },
+  "floor3_full_200__H60": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 60s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 60
+  },
+  "floor3_full_200__H120": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 120s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 120
+  },
+  "floor3_full_200__H300": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 300s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 300
+  },
+  "floor3_full_200__H600": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | horizon 600s",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "horizon_s": 600
+  },
+  "floor3_full_200__gain0": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | switch gain 0.0",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "switch_gain": 0.0
+  },
+  "floor3_full_200__gain5": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | switch gain 0.05",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "switch_gain": 0.05
+  },
+  "floor3_full_200__gain15": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | switch gain 0.15",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "switch_gain": 0.15
+  },
+  "floor3_full_200__gain30": {
+    "description": "200 people all on floor 3 (e.g. exam hall day), no fire - concentrated load on stairs | switch gain 0.3",
+    "n_agents": 200,
+    "spawn": "floor",
+    "floor": 3,
+    "step_free_frac": 0.0,
+    "fires": [],
+    "switch_gain": 0.3
+  }
+}
