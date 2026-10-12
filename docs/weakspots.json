@@ -1,0 +1,344 @@
+{
+ "scenario": "floor3_full_200",
+ "method": "ccrp",
+ "baseline_last_out_s": 212.2,
+ "baseline_mean_s": 150.6,
+ "rows": [
+  {
+   "element": "Stairwell 1 (all floors)",
+   "edges": [
+    [
+     "stairs 1",
+     "f1_stairs 1"
+    ],
+    [
+     "f1_stairs 1",
+     "f2_stairs 1"
+    ],
+    [
+     "f2_stairs 1",
+     "f3_stairs 1"
+    ],
+    [
+     "f3_stairs 1",
+     "f4_stairs 1"
+    ],
+    [
+     "f4_stairs 1",
+     "f5_stairs 1"
+    ],
+    [
+     "f5_stairs 1",
+     "f6_stairs 1"
+    ]
+   ],
+   "type": "stair_shaft",
+   "last_out_delta_s": 87.8,
+   "mean_delta_s": 45.4,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Stairwell 3 (all floors)",
+   "edges": [
+    [
+     "stairs 3",
+     "f1_stairs 3"
+    ],
+    [
+     "f1_stairs 3",
+     "f2_stairs 3"
+    ],
+    [
+     "f2_stairs 3",
+     "f3_stairs 3"
+    ],
+    [
+     "f3_stairs 3",
+     "f4_stairs 3"
+    ],
+    [
+     "f4_stairs 3",
+     "f5_stairs 3"
+    ],
+    [
+     "f5_stairs 3",
+     "f6_stairs 3"
+    ]
+   ],
+   "type": "stair_shaft",
+   "last_out_delta_s": 86.0,
+   "mean_delta_s": 49.4,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Exit door: north entrance/exit",
+   "edges": [
+    [
+     "north entrance/exit",
+     "j18"
+    ]
+   ],
+   "type": "exit_door",
+   "last_out_delta_s": 53.0,
+   "mean_delta_s": 28.2,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Stairwell 4 (all floors)",
+   "edges": [
+    [
+     "stairs 4",
+     "f1_stairs 4"
+    ],
+    [
+     "f1_stairs 4",
+     "f2_stairs 4"
+    ],
+    [
+     "f2_stairs 4",
+     "f3_stairs 4"
+    ],
+    [
+     "f3_stairs 4",
+     "f4_stairs 4"
+    ],
+    [
+     "f4_stairs 4",
+     "f5_stairs 4"
+    ]
+   ],
+   "type": "stair_shaft",
+   "last_out_delta_s": 45.3,
+   "mean_delta_s": 17.6,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor stairs 4 - j20",
+   "edges": [
+    [
+     "stairs 4",
+     "j20"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 42.8,
+   "mean_delta_s": 15.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Exit door: east entrance/exit",
+   "edges": [
+    [
+     "east entrance/exit",
+     "j6"
+    ]
+   ],
+   "type": "exit_door",
+   "last_out_delta_s": 30.3,
+   "mean_delta_s": 18.2,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Stairwell 2 (all floors)",
+   "edges": [
+    [
+     "stairs 2",
+     "f1_stairs 2"
+    ],
+    [
+     "f1_stairs 2",
+     "f2_stairs 2"
+    ],
+    [
+     "f2_stairs 2",
+     "f3_stairs 2"
+    ],
+    [
+     "f3_stairs 2",
+     "f4_stairs 2"
+    ],
+    [
+     "f4_stairs 2",
+     "f5_stairs 2"
+    ],
+    [
+     "f5_stairs 2",
+     "f6_stairs 2"
+    ]
+   ],
+   "type": "stair_shaft",
+   "last_out_delta_s": 18.2,
+   "mean_delta_s": 10.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j11 - j10",
+   "edges": [
+    [
+     "j11",
+     "j10"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 6.0,
+   "mean_delta_s": 8.2,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Exit door: east main entrance",
+   "edges": [
+    [
+     "east main entrance",
+     "j1"
+    ]
+   ],
+   "type": "exit_door",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Exit door: north main entrance",
+   "edges": [
+    [
+     "north main entrance",
+     "j1"
+    ]
+   ],
+   "type": "exit_door",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j1 - j2",
+   "edges": [
+    [
+     "j1",
+     "j2"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j2 - j3",
+   "edges": [
+    [
+     "j2",
+     "j3"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j3 - j4",
+   "edges": [
+    [
+     "j3",
+     "j4"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j5 - j4",
+   "edges": [
+    [
+     "j5",
+     "j4"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j20 - j3",
+   "edges": [
+    [
+     "j20",
+     "j3"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": 0.0,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j7 - j8",
+   "edges": [
+    [
+     "j7",
+     "j8"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": -0.2,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j8 - j9",
+   "edges": [
+    [
+     "j8",
+     "j9"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": -0.2,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor j9 - j10",
+   "edges": [
+    [
+     "j9",
+     "j10"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": -0.2,
+   "mean_delta_s": 0.0,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor stairs 3 - j6",
+   "edges": [
+    [
+     "stairs 3",
+     "j6"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": -1.8,
+   "mean_delta_s": 1.6,
+   "people_cut_off": 0.0
+  },
+  {
+   "element": "Corridor stairs 2 - j11",
+   "edges": [
+    [
+     "stairs 2",
+     "j11"
+    ]
+   ],
+   "type": "corridor",
+   "last_out_delta_s": -5.7,
+   "mean_delta_s": -0.6,
+   "people_cut_off": 0.0
+  }
+ ]
+}

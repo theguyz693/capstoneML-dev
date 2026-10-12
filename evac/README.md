@@ -3,7 +3,18 @@
 Research engine for the capstone study. Runs thousands of seeded evacuation
 simulations without the UI, so routing methods can be compared with statistics.
 
-## Run
+## Research dashboard
+```bash
+pip install fastapi uvicorn networkx
+python research_server.py          # starts the existing server.py app + research endpoints
+```
+- `http://localhost:8000/` - original 3D dashboard (unchanged)
+- `http://localhost:8000/research` - **Research Lab**: pick a scenario, methods, compliance and fire; watch the methods
+  race side by side on each floor (queues show as blobs), with a live scoreboard and "people still inside" curve;
+  **Kiosk signs** tab (the arrow every sign should show; click a spot for its kiosk screen);
+  **Weak spots** tab (which single failure hurts most).
+
+## Run experiments
 ```bash
 pip install networkx              # scikit-learn/pandas/joblib only needed for method "ml"
 python -m evac.runner                                    # all scenarios, 5 seeds
@@ -15,6 +26,8 @@ python tests/test_evac_session1.py                      # safety + reproducibili
 python tests/test_evac_session2.py                      # verification + reactive method checks
 python tests/test_evac_session3.py                      # planner checks
 python tests/test_evac_session4.py                      # behaviour + spreading fire checks
+python tests/test_evac_session5.py                      # replay, signs, weak spots, API
+python -m evac.weakspots --scenario floor3_full_200      # single-failure ranking -> docs/weakspots.md
 python -m evac.delay_model                              # ML: generate simulator data, train, compare vs formula (needs scikit-learn)
 ```
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
@@ -34,6 +47,8 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `optimum.py` | Theoretical lower bound via max-flow on a time-expanded network. |
 | `physics.py` | Speed–density relation and each edge's sustainable flow (used by simulator and planner). |
 | `delay_model.py` | Learned edge-delay predictor trained on simulator data; scenario/fire-location splits vs formulas. |
+| `weakspots.py` | Blocks each stairwell / exit door / key corridor in turn and ranks the damage (N-1 analysis). |
+| `api.py` | FastAPI endpoints for the dashboard (`/api/research/...`), mounted by `research_server.py`. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

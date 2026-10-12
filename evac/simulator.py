@@ -269,7 +269,32 @@ def run(G, scenario, method, seed):
     active = [a for a in agents if a.state == "waiting"]
     next_hazard = C.HAZARD_UPDATE_S
     forced = 0
+    track_every = float(scenario.get("record_tracks", 0) or 0)
+    next_frame = 0.0
+    frames = []
+
+    def snapshot(now):
+        pts = []
+        for a in agents:
+            if a.state in ("evacuated", "needs_assistance", "stranded") or a.path is None:
+                continue
+            if a.state == "moving":
+                u, v = a.path[a.idx], a.path[a.idx + 1]
+                f = min(1.0, a.pos / G.edges[u, v]["length_m"])
+                nu, nv = G.nodes[u], G.nodes[v]
+                x, y, z = (nu["x"] + f * (nv["x"] - nu["x"]), nu["y"] + f * (nv["y"] - nu["y"]),
+                           nu["z"] + f * (nv["z"] - nu["z"]))
+            else:
+                n0 = G.nodes[a.path[a.idx]]
+                x, y, z = n0["x"], n0["y"], n0["z"]
+            pts.append([a.id, round(x), round(y), round(z), {"waiting": 0, "queued": 1, "moving": 2}[a.state],
+                        int(a.compliant)])
+        frames.append({"t": round(now, 1), "pts": pts,
+                       "hazard": {n: G.nodes[n]["hazard"] for n in G if G.nodes[n]["hazard"] > 0} if dynamic else None})
     while t < C.MAX_TIME_S and (active or moving or any(queues.values())):
+        if track_every and t >= next_frame:
+            next_frame += track_every
+            snapshot(t)
         if dynamic and t >= next_hazard:
             next_hazard += C.HAZARD_UPDATE_S
             apply_hazard(G, fires, t)
@@ -403,6 +428,9 @@ def run(G, scenario, method, seed):
         metrics["edge_trace"] = edge_trace
     if log_edges:
         metrics["edge_rows"] = edge_rows
+    if track_every:
+        snapshot(t)
+        metrics["frames"] = frames
     records = [
         {"agent": a.id, "origin": a.origin, "step_free": a.step_free, "state": a.state,
          "exit": a.exit, "t_left": a.t_left, "t_out": a.t_out, "exposed": a.exposed, "route_changes": a.changes}

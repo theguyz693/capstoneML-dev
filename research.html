@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evacuation Research Lab</title>
+<style>
+  :root {
+    --bg: #080c16; --panel: #0f1626; --panel2: #141d31; --line: #22304d; --ink: #e6edf7; --muted: #8fa1bd;
+    --cyan: #22d3ee; --blue: #3b82f6; --amber: #f59e0b; --red: #ef4444; --green: #10b981; --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, Segoe UI, system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: #0b1120; }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header a { margin-left: auto; color: var(--cyan); text-decoration: none; font-size: 12px; }
+  .tabs { display: flex; gap: 6px; padding: 10px 18px 0; }
+  .tab { padding: 7px 14px; border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer; color: var(--muted); background: var(--panel); }
+  .tab.on { color: var(--ink); background: var(--panel2); border-color: #2f4268; }
+  .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 14px; padding: 14px 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  select, input[type=number] { width: 100%; background: #0a1020; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; }
+  input[type=range] { width: 100%; accent-color: var(--cyan); }
+  .checks label { display: flex; gap: 8px; align-items: center; color: var(--ink); margin: 6px 0; font-size: 13px; }
+  button { background: linear-gradient(90deg, #0ea5e9, #22d3ee); color: #04121c; border: none; border-radius: 9px; padding: 10px 12px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 14px; }
+  button.ghost { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); width: auto; margin: 0; padding: 7px 12px; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .desc { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .mp { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .mp .hd { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .mp .hd b { font-size: 13px; }
+  .mp .hd span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mp canvas { width: 100%; display: block; background: #070b14; }
+  .floors { display: flex; gap: 4px; padding: 6px 10px 10px; }
+  .floors div { flex: 1; text-align: center; font-size: 10px; color: var(--muted); }
+  .floors i { display: block; height: 26px; background: #0a1020; border-radius: 4px; position: relative; overflow: hidden; margin-bottom: 2px; }
+  .floors i em { position: absolute; bottom: 0; left: 0; right: 0; background: var(--cyan); opacity: .75; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .bar .t { font-variant-numeric: tabular-nums; min-width: 80px; color: var(--cyan); font-weight: 700; }
+  .bar input[type=range] { flex: 1; min-width: 160px; }
+  .fl { display: flex; gap: 4px; }
+  .fl button { width: auto; margin: 0; padding: 6px 10px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
+  .fl button.on { color: #04121c; background: var(--cyan); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td.best { color: var(--green); font-weight: 700; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .kiosk { background: #0b1222; border: 2px solid var(--red); border-radius: 14px; padding: 18px; }
+  .kiosk .big { font-size: 64px; line-height: 1; color: var(--green); }
+  .kiosk .msg { font-size: 18px; margin-top: 10px; }
+  .kiosk .where { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .hidden { display: none !important; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Evacuation Research Lab</h1>
+  <span class="sub">Same people, same fire - different routing methods, side by side</span>
+  <a href="/">← 3D dashboard</a>
+</header>
+<div class="tabs">
+  <div class="tab on" data-tab="race">Method race</div>
+  <div class="tab" data-tab="signs">Kiosk signs</div>
+  <div class="tab" data-tab="weak">Weak spots</div>
+</div>
+
+<!-- ===================== METHOD RACE ===================== -->
+<div class="wrap" id="tab-race">
+  <div class="card">
+    <h3>Scenario</h3>
+    <select id="scen"></select>
+    <div class="desc" id="scenDesc"></div>
+    <label>Methods to compare</label>
+    <div class="checks" id="methods"></div>
+    <label>People who follow guidance: <b id="compV">100%</b></label>
+    <input type="range" id="comp" min="0.4" max="1" step="0.1" value="1">
+    <label>Herding (non-followers copy the crowd)</label>
+    <select id="herd"><option value="">scenario default</option><option value="0">off</option><option value="0.6">on (60%)</option></select>
+    <label>Fire</label>
+    <select id="fire"><option value="">scenario default</option><option value="__none">no fire</option></select>
+    <div class="checks"><label><input type="checkbox" id="spread"> fire spreads over time</label></div>
+    <label>Seed (same seed = same people)</label>
+    <input type="number" id="seed" value="0" min="0">
+    <button id="runBtn">Run comparison</button>
+    <div class="desc" id="status"></div>
+  </div>
+  <div class="main">
+    <div class="card">
+      <div class="bar">
+        <button class="ghost" id="play">▶ Play</button>
+        <span class="t" id="tlabel">t = 0 s</span>
+        <input type="range" id="scrub" min="0" max="0" value="0">
+        <select id="speed" style="width:auto"><option>1</option><option selected>5</option><option>10</option><option>20</option></select>
+        <span class="desc" style="margin:0">× speed</span>
+        <div class="fl" id="floorBtns"></div>
+      </div>
+      <div class="legend" style="margin-top:8px">
+        <span><i style="background:var(--cyan)"></i>follows guidance</span>
+        <span><i style="background:var(--amber)"></i>ignores guidance</span>
+        <span><i style="background:var(--red)"></i>fire / smoke</span>
+        <span><i style="background:var(--green)"></i>exit</span>
+        <span><i style="background:var(--violet)"></i>stairs</span>
+      </div>
+    </div>
+    <div class="panels" id="panels"></div>
+    <div class="card">
+      <h3>Scoreboard</h3>
+      <table id="score"></table>
+    </div>
+    <div class="card">
+      <h3>People still inside</h3>
+      <canvas id="curve" height="220" style="width:100%"></canvas>
+      <div class="legend" id="curveLegend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== KIOSK SIGNS ===================== -->
+<div class="wrap hidden" id="tab-signs">
+  <div class="card">
+    <h3>Signage</h3>
+    <label>Fire location</label>
+    <select id="sFire"><option value="">no fire</option></select>
+    <label>Fire radius (graph units): <b id="sRadV">400</b></label>
+    <input type="range" id="sRad" min="150" max="900" step="50" value="400">
+    <div class="checks"><label><input type="checkbox" id="sStep"> step-free (wheelchair) routing</label></div>
+    <label>Floor</label>
+    <div class="fl" id="sFloorBtns"></div>
+    <div class="desc">Every arrow points the way a sign at that spot should point. Click any node to see its kiosk screen.</div>
+    <div class="kiosk" id="kiosk" style="margin-top:14px">
+      <div class="big" id="kArrow">→</div>
+      <div class="msg" id="kMsg">Click a node on the plan.</div>
+      <div class="where" id="kWhere"></div>
+    </div>
+  </div>
+  <div class="main"><div class="mp"><canvas id="signCanvas" height="640"></canvas></div></div>
+</div>
+
+<!-- ===================== WEAK SPOTS ===================== -->
+<div class="wrap hidden" id="tab-weak">
+  <div class="card">
+    <h3>Single-failure ranking</h3>
+    <div class="desc" id="wDesc">Blocks one stair flight / exit door / key corridor at a time and re-runs the same evacuation.</div>
+    <label>Floor</label>
+    <div class="fl" id="wFloorBtns"></div>
+    <div class="desc" style="margin-top:12px">Highlighted on the plan: the top 5 elements. Regenerate with <code>python -m evac.weakspots</code>.</div>
+  </div>
+  <div class="main">
+    <div class="mp"><canvas id="weakCanvas" height="520"></canvas></div>
+    <div class="card"><table id="weakTable"></table></div>
+  </div>
+</div>
+
+<script>
+const API = "/api/research";
+const LABEL = { nearest: "Nearest exit", safe_shortest: "Shortest safe path", reactive: "Reactive rerouting",
+  ccrp: "Capacity booking", lookahead: "Look-ahead re-planning", ml: "Old ML edge cost" };
+const LINE = { nearest: "#94a3b8", safe_shortest: "#64748b", reactive: "#f59e0b", ccrp: "#a78bfa", lookahead: "#22d3ee", ml: "#f472b6" };
+const DEFAULT_METHODS = ["safe_shortest", "reactive", "lookahead"];
+const FLOOR_H = 350;
+let B = null, scen = {}, result = null, frameIdx = 0, playing = false, floor = 3, timer = null;
+
+const $ = id => document.getElementById(id);
+const floorOf = z => Math.round(z / FLOOR_H);
+
+// ------------------------------------------------ plan drawing
+let bounds = null;
+function computeBounds() {
+  const xs = B.nodes.map(n => n.x), ys = B.nodes.map(n => n.y);
+  bounds = { x0: Math.min(...xs) - 60, x1: Math.max(...xs) + 60, y0: Math.min(...ys) - 60, y1: Math.max(...ys) + 60 };
+}
+function fitCanvas(cv) {
+  const w = cv.clientWidth, h = Math.round(w * (bounds.y1 - bounds.y0) / (bounds.x1 - bounds.x0));
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.height = h + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const s = w / (bounds.x1 - bounds.x0);
+  return { ctx, P: (x, y) => [(x - bounds.x0) * s, (y - bounds.y0) * s], s, w, h };
+}
+const nodeById = () => Object.fromEntries(B.nodes.map(n => [n.id, n]));
+let NB = {};
+
+function drawPlan(view, fl, hazard, opts = {}) {
+  const { ctx, P } = view;
+  ctx.clearRect(0, 0, view.w, view.h);
+  // hazard glow
+  for (const [id, h] of Object.entries(hazard || {})) {
+    const n = NB[id]; if (!n || n.floor !== fl || h <= 0.05) continue;
+    const [x, y] = P(n.x, n.y);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 26);
+    g.addColorStop(0, `rgba(239,68,68,${0.55 * h})`); g.addColorStop(1, "rgba(239,68,68,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.fill();
+  }
+  ctx.lineWidth = 1.2;
+  for (const [u, v, t] of B.edges) {
+    const a = NB[u], b = NB[v];
+    if (a.floor !== fl || b.floor !== fl) continue;
+    const hl = opts.highlight && opts.highlight[`${u}|${v}`];
+    ctx.strokeStyle = hl ? hl : (t === "corridor" ? "#2a3a5c" : "#1d2a44");
+    ctx.lineWidth = hl ? 4 : 1.2;
+    const [x1, y1] = P(a.x, a.y), [x2, y2] = P(b.x, b.y);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  for (const n of B.nodes) {
+    if (n.floor !== fl) continue;
+    const [x, y] = P(n.x, n.y);
+    const hl = opts.highlightNode && opts.highlightNode[n.id];
+    if (n.kind === "exit") { ctx.fillStyle = "#10b981"; ctx.fillRect(x - 5, y - 5, 10, 10); }
+    else if (n.kind === "stair") { ctx.fillStyle = hl || "#a78bfa"; ctx.fillRect(x - (hl ? 6 : 4), y - (hl ? 6 : 4), hl ? 12 : 8, hl ? 12 : 8); }
+    else if (n.kind === "lift") { ctx.strokeStyle = "#475569"; ctx.strokeRect(x - 3, y - 3, 6, 6); }
+    else { ctx.fillStyle = n.kind === "room" ? "#334155" : "#3b4a6b"; ctx.beginPath(); ctx.arc(x, y, n.kind === "room" ? 2 : 1.6, 0, 7); ctx.fill(); }
+  }
+}
+
+// ------------------------------------------------ method race
+const views = {};
+function buildPanels(methods) {
+  const el = $("panels"); el.innerHTML = "";
+  for (const m of methods) {
+    const d = document.createElement("div"); d.className = "mp";
+    d.innerHTML = `<div class="hd"><b style="color:${LINE[m]}">${LABEL[m]}</b><span id="hd-${m}"></span></div>
+      <canvas id="cv-${m}"></canvas><div class="floors" id="fl-${m}"></div>`;
+    el.appendChild(d);
+  }
+  requestAnimationFrame(() => { for (const m of methods) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); });
+}
+
+function drawFrame() {
+  if (!result) return;
+  const methods = Object.keys(result.results);
+  let tShown = 0;
+  for (const m of methods) {
+    const R = result.results[m], fr = R.frames[Math.min(frameIdx, R.frames.length - 1)];
+    if (!views[m] || !fr) continue;
+    tShown = Math.max(tShown, fr.t);
+    drawPlan(views[m], floor, fr.hazard || result.static_hazard);
+    const { ctx, P } = views[m];
+    const perFloor = [0, 0, 0, 0, 0, 0, 0];
+    for (const [id, x, y, z, st, comp] of fr.pts) {
+      const f = floorOf(z); perFloor[Math.max(0, Math.min(6, f))]++;
+      if (f !== floor) continue;
+      // spread people standing in a queue into a blob so a jam is visible (queued = state 1)
+      const r = st === 1 ? 14 + 4 * Math.sqrt(id % 40) : 8, ang = id * 2.399963;
+      const [px, py] = P(x + r * Math.cos(ang), y + r * Math.sin(ang));
+      ctx.fillStyle = comp ? "#22d3ee" : "#f59e0b";
+      ctx.globalAlpha = st === 1 ? 0.95 : 0.8;
+      ctx.beginPath(); ctx.arc(px, py, st === 1 ? 3.2 : 2.6, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const inside = R.inside[Math.min(frameIdx, R.inside.length - 1)];
+    const done = frameIdx >= R.frames.length - 1;
+    $(`hd-${m}`).textContent = done ? `all out at ${R.metrics.evac_time_last_s}s` : `${inside ? inside.inside : 0} inside`;
+    const mx = Math.max(1, ...perFloor);
+    $(`fl-${m}`).innerHTML = perFloor.map((c, i) =>
+      `<div><i><em style="height:${100 * c / mx}%"></em></i>${i === 0 ? "G" : "F" + i}${c ? " · " + c : ""}</div>`).join("");
+  }
+  $("tlabel").textContent = `t = ${tShown.toFixed(0)} s`;
+  $("scrub").value = frameIdx;
+}
+
+function maxFrames() { return Math.max(...Object.values(result.results).map(r => r.frames.length)); }
+
+function play() {
+  if (!result) return;
+  playing = !playing; $("play").textContent = playing ? "⏸ Pause" : "▶ Play";
+  clearInterval(timer);
+  if (playing) {
+    const stepS = result.results[Object.keys(result.results)[0]].frames[1]?.t || 2;
+    timer = setInterval(() => {
+      if (frameIdx >= maxFrames() - 1) { play(); return; }
+      frameIdx++; drawFrame();
+    }, 1000 * stepS / Number($("speed").value));
+  }
+}
+
+function scoreboard() {
+  const rows = Object.entries(result.results).map(([m, r]) => ({ m, ...r.metrics }));
+  const cols = [["evac_time_last_s", "Last out (s)"], ["evac_time_mean_s", "Average person (s)"],
+    ["exposed_agents", "Exposed to hazard"], ["max_queue", "Longest queue"], ["route_changes", "Route changes"],
+    ["needs_assistance", "Needs assistance"]];
+  const best = {};
+  for (const [k] of cols) best[k] = Math.min(...rows.map(r => r[k] ?? Infinity));
+  $("score").innerHTML = `<tr><th>Method</th>${cols.map(c => `<th>${c[1]}</th>`).join("")}</tr>` +
+    rows.map(r => `<tr><td style="color:${LINE[r.m]};font-weight:600">${LABEL[r.m]}</td>${cols.map(([k]) =>
+      `<td class="${r[k] === best[k] && rows.length > 1 && k !== "needs_assistance" ? "best" : ""}">${r[k] ?? "-"}</td>`).join("")}</tr>`).join("");
+}
+
+function curve() {
+  const cv = $("curve"), w = cv.clientWidth, h = 220, dpr = window.devicePixelRatio || 1;
+  cv.width = w * dpr; cv.height = h * dpr; const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const all = Object.values(result.results);
+  const T = Math.max(...all.map(r => r.inside.at(-1)?.t || 0)), N = Math.max(...all.map(r => r.metrics.n_agents));
+  const L = 44, R = 12, Tp = 10, Bt = 28, X = t => L + (w - L - R) * t / T, Y = n => Tp + (h - Tp - Bt) * (1 - n / N);
+  ctx.strokeStyle = "#1d2a44"; ctx.fillStyle = "#8fa1bd"; ctx.font = "11px system-ui"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const n = N * i / 4; ctx.beginPath(); ctx.moveTo(L, Y(n)); ctx.lineTo(w - R, Y(n)); ctx.stroke(); ctx.fillText(Math.round(n), 8, Y(n) + 4); }
+  for (let i = 0; i <= 5; i++) { const t = T * i / 5; ctx.fillText(`${Math.round(t)} s`, X(t) - 10, h - 8); }
+  for (const [m, r] of Object.entries(result.results)) {
+    ctx.strokeStyle = LINE[m]; ctx.lineWidth = 2; ctx.beginPath();
+    r.inside.forEach((p, i) => i ? ctx.lineTo(X(p.t), Y(p.inside)) : ctx.moveTo(X(p.t), Y(p.inside))); ctx.stroke();
+  }
+  $("curveLegend").innerHTML = Object.keys(result.results).map(m =>
+    `<span><i style="background:${LINE[m]}"></i>${LABEL[m]} - all out at ${result.results[m].metrics.evac_time_last_s}s</span>`).join("");
+}
+
+async function runRace() {
+  const methods = [...document.querySelectorAll("#methods input:checked")].map(i => i.value);
+  if (!methods.length) { $("status").textContent = "Pick at least one method."; return; }
+  const body = { scenario: $("scen").value, methods, seed: Number($("seed").value), compliance: Number($("comp").value) };
+  if ($("herd").value !== "") body.herding = Number($("herd").value);
+  const f = $("fire").value;
+  if (f === "__none") { body.fire_node = null; }
+  else if (f) { body.fire_node = f; body.fire_radius = 500; }
+  if ($("spread").checked) {
+    body.fire_spreading = true;
+    body.fire_node = body.fire_node || (scen[$("scen").value].fires[0] || {}).node || "j19";
+  }
+  $("runBtn").disabled = true; $("status").textContent = "Simulating… (a few seconds per method)";
+  if (playing) play();
+  try {
+    const res = await fetch(`${API}/run`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(await res.text());
+    result = await res.json();
+    if (f === "__none") { result.static_hazard = {}; }
+    frameIdx = 0; $("scrub").max = maxFrames() - 1;
+    buildPanels(methods); scoreboard(); curve();
+    $("status").textContent = "Done. Press Play.";
+  } catch (e) { $("status").textContent = "Error: " + e.message; }
+  $("runBtn").disabled = false;
+}
+
+function floorButtons(el, cb, initial) {
+  el.innerHTML = [0, 1, 2, 3, 4, 5, 6].map(f => `<button data-f="${f}" class="${f === initial ? "on" : ""}">${f ? "F" + f : "G"}</button>`).join("");
+  el.onclick = e => {
+    const f = e.target.dataset.f; if (f === undefined) return;
+    [...el.children].forEach(b => b.classList.toggle("on", b.dataset.f === f)); cb(Number(f));
+  };
+}
+
+// ------------------------------------------------ kiosk signs
+let sFloor = 0, signs = null, sView = null;
+async function loadSigns(kioskNode) {
+  const body = { fire_node: $("sFire").value || null, fire_radius: Number($("sRad").value), step_free: $("sStep").checked, kiosk_node: kioskNode || null };
+  const res = await fetch(`${API}/signs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  signs = await res.json(); drawSigns();
+  if (signs.kiosk) showKiosk(signs.kiosk);
+}
+function drawSigns() {
+  sView = fitCanvas($("signCanvas"));
+  drawPlan(sView, sFloor, signs.hazard);
+  const { ctx, P } = sView;
+  for (const [id, nxt] of Object.entries(signs.arrows)) {
+    const a = NB[id]; if (!a || a.floor !== sFloor || !nxt) continue;
+    const b = NB[nxt]; const [x1, y1] = P(a.x, a.y);
+    let ang;
+    if (b.floor !== a.floor) { ctx.fillStyle = "#a78bfa"; ctx.font = "bold 12px system-ui"; ctx.fillText("↓", x1 - 4, y1 - 6); continue; }
+    const [x2, y2] = P(b.x, b.y); ang = Math.atan2(y2 - y1, x2 - x1);
+    const L = 11;
+    ctx.strokeStyle = "#10b981"; ctx.fillStyle = "#10b981"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 + L * Math.cos(ang), y1 + L * Math.sin(ang)); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1 + (L + 5) * Math.cos(ang), y1 + (L + 5) * Math.sin(ang));
+    ctx.lineTo(x1 + L * Math.cos(ang) - 4 * Math.sin(ang), y1 + L * Math.sin(ang) + 4 * Math.cos(ang));
+    ctx.lineTo(x1 + L * Math.cos(ang) + 4 * Math.sin(ang), y1 + L * Math.sin(ang) - 4 * Math.cos(ang));
+    ctx.fill();
+  }
+  if (signs.kiosk && signs.kiosk.node && NB[signs.kiosk.node].floor === sFloor) {
+    const [x, y] = P(NB[signs.kiosk.node].x, NB[signs.kiosk.node].y);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke();
+  }
+}
+function showKiosk(k) {
+  const n = NB[k.node];
+  if (!k.path) { $("kArrow").textContent = "⚠"; $("kArrow").style.color = "var(--red)"; }
+  else {
+    const nx = NB[k.next];
+    $("kArrow").style.color = "var(--green)";
+    if (nx.floor < n.floor) $("kArrow").textContent = "⬇";
+    else { const a = Math.atan2(nx.y - n.y, nx.x - n.x) * 180 / Math.PI; const dirs = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
+      $("kArrow").textContent = dirs[(Math.round(a / 45) + 8) % 8]; }
+  }
+  $("kMsg").textContent = k.message;
+  $("kWhere").textContent = `Kiosk at ${k.node} (${n.floor ? "floor " + n.floor : "ground floor"})`;
+}
+$("signCanvas").addEventListener("click", e => {
+  if (!sView) return;
+  const r = e.target.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  let best = null, bd = 1e9;
+  for (const n of B.nodes) { if (n.floor !== sFloor) continue; const [x, y] = sView.P(n.x, n.y); const d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; best = n.id; } }
+  if (best) loadSigns(best);
+});
+
+// ------------------------------------------------ weak spots
+let wFloor = 0, weak = null;
+async function loadWeak() {
+  const res = await fetch(`${API}/weakspots`);
+  if (!res.ok) { $("wDesc").textContent = "No weak-spot results yet. Run: python -m evac.weakspots"; return; }
+  weak = await res.json();
+  $("wDesc").textContent = `Scenario ${weak.scenario}, method ${weak.method}. Baseline: last person out at ${weak.baseline_last_out_s}s.`;
+  $("weakTable").innerHTML = `<tr><th>#</th><th>Blocked element</th><th>Last out</th><th>Average person</th><th>Cut off</th></tr>` +
+    weak.rows.slice(0, 15).map((r, i) => `<tr><td>${i + 1}</td><td>${r.element}</td><td>${r.last_out_delta_s == null ? "-" : "+" + r.last_out_delta_s + " s"}</td>
+      <td>${r.mean_delta_s == null ? "-" : (r.mean_delta_s >= 0 ? "+" : "") + r.mean_delta_s + " s"}</td><td>${r.people_cut_off}</td></tr>`).join("");
+  drawWeak();
+}
+function drawWeak() {
+  if (!weak) return;
+  const v = fitCanvas($("weakCanvas")), hl = {}, hn = {};
+  weak.rows.slice(0, 5).forEach(r => r.edges.forEach(([u, w]) => { hl[`${u}|${w}`] = hl[`${w}|${u}`] = "#ef4444"; hn[u] = hn[w] = "#ef4444"; }));
+  drawPlan(v, wFloor, {}, { highlight: hl, highlightNode: hn });
+}
+
+// ------------------------------------------------ init
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  for (const k of ["race", "signs", "weak"]) $(`tab-${k}`).classList.toggle("hidden", t.dataset.tab !== k);
+  if (t.dataset.tab === "signs" && !signs) loadSigns();
+  if (t.dataset.tab === "weak" && !weak) loadWeak();
+  if (t.dataset.tab === "race" && result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); }
+});
+
+(async function init() {
+  B = await (await fetch(`${API}/building`)).json(); NB = nodeById(); computeBounds();
+  scen = await (await fetch(`${API}/scenarios`)).json();
+  $("scen").innerHTML = Object.keys(scen).map(k => `<option ${k === "floor3_full_200" ? "selected" : ""}>${k}</option>`).join("");
+  const showDesc = () => $("scenDesc").textContent = scen[$("scen").value].description || "";
+  $("scen").onchange = showDesc; showDesc();
+  $("methods").innerHTML = Object.keys(LABEL).filter(m => m !== "ml").map(m =>
+    `<label><input type="checkbox" value="${m}" ${DEFAULT_METHODS.includes(m) ? "checked" : ""}><span style="color:${LINE[m]}">●</span> ${LABEL[m]}</label>`).join("");
+  const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
+  $("fire").innerHTML += junctions.map(j => `<option>${j}</option>`).join("");
+  $("sFire").innerHTML += junctions.map(j => `<option ${j === "j19" ? "selected" : ""}>${j}</option>`).join("");
+  $("comp").oninput = () => $("compV").textContent = Math.round($("comp").value * 100) + "%";
+  $("sRad").oninput = () => { $("sRadV").textContent = $("sRad").value; };
+  $("sRad").onchange = () => loadSigns();
+  $("sFire").onchange = () => loadSigns(); $("sStep").onchange = () => loadSigns();
+  floorButtons($("floorBtns"), f => { floor = f; drawFrame(); }, floor);
+  floorButtons($("sFloorBtns"), f => { sFloor = f; if (signs) drawSigns(); }, sFloor);
+  floorButtons($("wFloorBtns"), f => { wFloor = f; drawWeak(); }, wFloor);
+  $("runBtn").onclick = runRace; $("play").onclick = play;
+  $("scrub").oninput = e => { frameIdx = Number(e.target.value); drawFrame(); };
+  window.addEventListener("resize", () => { if (result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); } });
+})();
+</script>
+</body>
+</html>
