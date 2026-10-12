@@ -81,6 +81,27 @@ def _attach_physics(G):
     return G
 
 
+def build_graph(nodes, edges, floor_height=350):
+    """
+    Build ANY building from plain data.
+      nodes: {name: (x, y, floor)}  - x, y in the same units as METERS_PER_UNIT
+      edges: [(u, v), ...]          - physically walkable connections only
+    Node kinds come from names (exit/entrance, stairs, lift, j*, otherwise room),
+    so a new building only needs the same naming conventions as campus_data.py.
+    """
+    G = nx.Graph()
+    for name, (x, y, fl) in nodes.items():
+        G.add_node(name, floor=fl, x=x, y=y, z=fl * floor_height)
+    for u, v in edges:
+        if u in G and v in G and u != v:
+            a, b = G.nodes[u], G.nodes[v]
+            dist = math.sqrt((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2 + (a["z"] - b["z"]) ** 2)
+            G.add_edge(u, v, base_distance=round(dist, 2))
+    for n in G.nodes:
+        G.nodes[n]["kind"] = node_kind(n)
+    return _attach_physics(G)
+
+
 def load_campus():
     """Main Block: Ground + 6 floors. Geometry identical to build_full_campus_graph()."""
     import campus_data as cd

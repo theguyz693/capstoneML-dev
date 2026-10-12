@@ -23,7 +23,7 @@ from collections import defaultdict
 from . import config as C
 from .building import room_nodes
 from .hazard import apply_hazard
-from .routing import route_table
+from .routing import route_table, congestion_route_table
 
 
 def weidmann_speed_factor(density):
@@ -42,7 +42,7 @@ def _ekey(u, v):
 
 class Agent:
     __slots__ = ("id", "origin", "path", "idx", "pos", "state", "start", "speed_mult",
-                 "step_free", "queued_at", "t_out", "exposed", "max_hazard", "exit")
+                 "step_free", "queued_at", "t_out", "exposed", "max_hazard", "exit", "changes", "t_left")
 
     def __init__(self, aid, origin, start, speed_mult, step_free):
         self.id = aid
@@ -59,6 +59,8 @@ class Agent:
         self.exposed = False
         self.max_hazard = 0.0
         self.exit = None
+        self.changes = 0
+        self.t_left = None    # time the agent left its origin room (passed the room door)
 
 
 def spawn(G, scenario, rng):
@@ -83,15 +85,43 @@ def spawn(G, scenario, rng):
             pool = by_floor[floors[i % len(floors)]]
             origins.append(pool[rng.randrange(len(pool))])
     sf = float(scenario.get("step_free_frac", 0.0))
+    pre = float(scenario.get("pre_movement_max_s", C.PRE_MOVEMENT_MAX_S))
+    spread = float(scenario.get("speed_spread", C.AGENT_SPEED_SPREAD))
     agents = []
     for i, o in enumerate(origins):
         agents.append(Agent(
             aid=i, origin=o,
-            start=rng.uniform(0.0, C.PRE_MOVEMENT_MAX_S),
-            speed_mult=1.0 + rng.uniform(-C.AGENT_SPEED_SPREAD, C.AGENT_SPEED_SPREAD),
+            start=rng.uniform(0.0, pre),
+            speed_mult=1.0 + rng.uniform(-spread, spread),
             step_free=(rng.random() < sf),
         ))
     return agents
+
+
+def _reactive_reroute(G, fire_active, queues, occ, waiting_agents):
+    """Re-plan agents standing at a node whose remaining route crosses a visible queue."""
+    qlen = {n: len(q) for n, q in queues.items() if q}
+    hot = {n for n, k in qlen.items() if k >= C.REACTIVE_QUEUE_THRESHOLD}
+    if not hot:
+        return
+    standing = [a for q in queues.values() for a in q] + list(waiting_agents)
+    affected = [a for a in standing if a.path and any(n in hot for n in a.path[a.idx:-1])]
+    if not affected:
+        return
+    qcount = {}
+    for q in queues.values():
+        for a in q:
+            e = (a.path[a.idx], a.path[a.idx + 1])
+            qcount[e] = qcount.get(e, 0) + 1
+    tables = {}
+    for a in affected:
+        if a.step_free not in tables:
+            tables[a.step_free] = congestion_route_table(G, fire_active, a.step_free, qcount, occ)
+        new = tables[a.step_free].get(a.path[a.idx])
+        if new and new != a.path[a.idx:]:
+            a.path = a.path[:a.idx] + new
+            a.exit = new[-1]
+            a.changes += 1
 
 
 def run(G, scenario, method, seed):
@@ -105,9 +135,10 @@ def run(G, scenario, method, seed):
     agents = spawn(G, scenario, rng)
 
     # routes: one multi-source Dijkstra per (method, step_free) covers every origin
+    base = "safe_shortest" if method == "reactive" else method
     tables = {
-        False: route_table(G, method, fire_active, step_free=False),
-        True: route_table(G, method, fire_active, step_free=True),
+        False: route_table(G, base, fire_active, step_free=False),
+        True: route_table(G, base, fire_active, step_free=True),
     }
     for a in agents:
         p = tables[a.step_free].get(a.origin)
@@ -124,13 +155,21 @@ def run(G, scenario, method, seed):
     max_queue, max_queue_node = 0, None
     peak_density = 0.0
 
+    trace_key = tuple(sorted(scenario["trace_edge"])) if scenario.get("trace_edge") else None
+    edge_trace = []
     t = 0.0
+    next_reroute = C.REROUTE_INTERVAL_S
     active = [a for a in agents if a.state == "waiting"]
     while t < C.MAX_TIME_S and (active or moving or any(queues.values())):
+        if method == "reactive" and t >= next_reroute:
+            next_reroute += C.REROUTE_INTERVAL_S
+            _reactive_reroute(G, fire_active, queues, occ, active)
         # flow budgets refill
         for u, v, d in G.edges(data=True):
             k = _ekey(u, v)
-            budget[k] = min(budget[k] + d["flow_cap"] * C.DT, max(1.0, d["flow_cap"] * C.DT))
+            # keep the fractional remainder so the long-run rate equals flow_cap exactly;
+            # the cap stops an idle door from "saving up" a burst
+            budget[k] = min(budget[k] + d["flow_cap"] * C.DT, d["flow_cap"] * C.DT + 1.0)
 
         # agents whose pre-movement time is over join the queue at their origin
         still = []
@@ -153,6 +192,8 @@ def run(G, scenario, method, seed):
             k = _ekey(u, v)
             dens = occ[k] / (d["length_m"] * d["width_m"])
             peak_density = max(peak_density, dens)
+            if trace_key is not None and k == trace_key:
+                edge_trace.append((round(t, 2), round(dens, 3), round(weidmann_speed_factor(dens) * d["free_speed"], 3)))
             a.pos += d["free_speed"] * a.speed_mult * weidmann_speed_factor(dens) * C.DT
             if a.pos >= d["length_m"]:
                 arrived.append(a)
@@ -183,6 +224,8 @@ def run(G, scenario, method, seed):
                     budget[k] -= 1.0
                     occ[k] += 1
                     a.state = "moving"
+                    if a.t_left is None:
+                        a.t_left = t
                     moving.append(a)
                     h = d.get("hazard", 0.0)
                     a.max_hazard = max(a.max_hazard, h)
@@ -211,6 +254,7 @@ def run(G, scenario, method, seed):
 
     metrics = {
         "method": method,
+        "route_changes": sum(a.changes for a in agents),
         "seed": seed,
         "n_agents": n,
         "evacuated": len(out),
@@ -229,9 +273,11 @@ def run(G, scenario, method, seed):
         "sim_time_s": round(t, 1),
         "compute_s": round(time.perf_counter() - t0, 3),
     }
+    if trace_key is not None:
+        metrics["edge_trace"] = edge_trace
     records = [
         {"agent": a.id, "origin": a.origin, "step_free": a.step_free, "state": a.state,
-         "exit": a.exit, "t_out": a.t_out, "exposed": a.exposed}
+         "exit": a.exit, "t_left": a.t_left, "t_out": a.t_out, "exposed": a.exposed, "route_changes": a.changes}
         for a in agents
     ]
     return metrics, records

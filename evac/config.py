@@ -62,6 +62,13 @@ SMOKE_STAIR_MAX_FLOORS = 6
 LIFTS_DISABLED_IN_FIRE = True
 LIFTS_ONLY_FOR_STEP_FREE = True
 
+# ---------------------------------------------------------------- reactive rerouting
+# The 'reactive' method reroutes people only AFTER congestion is visible:
+# every REROUTE_INTERVAL_S, anyone standing at a node whose remaining route passes a
+# queue of >= REACTIVE_QUEUE_THRESHOLD people is re-planned with current queue waits.
+REROUTE_INTERVAL_S = 5.0
+REACTIVE_QUEUE_THRESHOLD = 8
+
 # ---------------------------------------------------------------- simulation
 DT = 0.5                      # seconds per simulation step
 MAX_TIME_S = 1800.0           # stop after 30 minutes of simulated time

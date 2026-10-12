@@ -9,10 +9,12 @@ Route choice for evacuees, with HARD safety rules applied before any cost:
 A cost function can make a route slower, but it can never send anyone through
 a removed edge.
 
-Methods (static: each agent's route is fixed at the start):
+Methods:
   nearest        shortest walking distance to any exit (hazard-blind apart from the hard rules)
   safe_shortest  travel time x hazard penalty (rule-based, same penalty shape as generate_dataset.py)
   ml             the existing Random Forest edge-cost model (needs scikit-learn + models/)
+  reactive       starts like safe_shortest, then reroutes people once queues have formed
+                 (current congestion only - no prediction). See congestion_route_table().
 
 All exits are searched at once with one multi-source Dijkstra from the exits, which
 gives EVERY node its best path in a single pass.
@@ -22,7 +24,7 @@ import networkx as nx
 from . import config as C
 from .building import exits
 
-METHODS = ("nearest", "safe_shortest", "ml")
+METHODS = ("nearest", "safe_shortest", "ml", "reactive")
 
 
 def _allowed(d, fire_active, step_free):
@@ -101,3 +103,32 @@ def next_hop_signs(G, method="safe_shortest", fire_active=True, step_free=False)
     """Building-wide 'go this way' arrow for every node (kiosk signage)."""
     table = route_table(G, method, fire_active, step_free)
     return {n: (p[1] if len(p) > 1 else None) for n, p in table.items()}
+
+
+def congestion_route_table(G, fire_active, step_free, queue_count, occupancy):
+    """
+    Routes using CURRENT congestion (used by the 'reactive' method).
+    Cost of entering edge a->b = travel time at current density x hazard penalty
+                                 + expected wait in the queue at a (queued people / flow capacity).
+    queue_count: {(a, b): people waiting at a to enter a->b}
+    occupancy:   {sorted edge key: people currently on the edge}
+    The search runs outward from the exits, so when networkx relaxes u -> v the
+    evacuee actually walks v -> u and queues at v.
+    """
+    from .simulator import weidmann_speed_factor
+
+    ex = [e for e in exits(G) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE]
+    if not ex:
+        return {}
+
+    def w(u, v, d):
+        if not _allowed(d, fire_active, step_free):
+            return None
+        key = (u, v) if u <= v else (v, u)
+        dens = occupancy.get(key, 0) / (d["length_m"] * d["width_m"])
+        t = d["length_m"] / (d["free_speed"] * weidmann_speed_factor(dens))
+        wait = queue_count.get((v, u), 0) / d["flow_cap"]
+        return t * _hazard_penalty(d.get("hazard", 0.0)) + wait
+
+    _dist, paths = nx.multi_source_dijkstra(G, ex, weight=w)
+    return {n: list(reversed(p)) for n, p in paths.items()}
