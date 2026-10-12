@@ -77,6 +77,16 @@ SWITCH_GAIN = 0.15            # switch route only if predicted >= 15% faster (an
 HAZARD_DETOUR_PENALTY_S = 300.0  # planner adds this per edge with hazard >= HAZARD_EXPOSURE, so it only
                                  # trades safety for speed when waiting would exceed ~5 min
 
+# ---------------------------------------------------------------- behaviour (Session 4)
+# These are SWEPT in experiments, not claimed to be measured human behaviour.
+COMPLIANCE = 1.0              # share of people who follow the system's route
+HERDING = 0.0                 # chance a non-compliant person copies the majority exit of the queue they join
+FAMILIAR_EXIT = "north main entrance"   # where non-compliant people head by default (the way they came in)
+
+# ---------------------------------------------------------------- spreading fire (Session 4)
+HAZARD_UPDATE_S = 10.0        # recompute the hazard field this often when a fire spreads
+STAIR_SMOKE_DELAY_S = 30.0    # in a spreading fire, smoke needs ~30 s per floor to climb a stair shaft
+
 # ---------------------------------------------------------------- simulation
 DT = 0.5                      # seconds per simulation step
 MAX_TIME_S = 1800.0           # stop after 30 minutes of simulated time

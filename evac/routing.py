@@ -89,9 +89,10 @@ def weight_fn(G, method, fire_active, step_free):
     return w
 
 
-def route_table(G, method, fire_active, step_free):
-    """{node: path-to-best-exit} for every node that can reach an exit."""
-    ex = [e for e in exits(G) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE]
+def route_table(G, method, fire_active, step_free, targets=None):
+    """{node: path-to-best-exit} for every node that can reach an exit.
+    targets: restrict to these exits (e.g. a person's familiar exit)."""
+    ex = [e for e in (targets or exits(G)) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE]
     if not ex:
         return {}
     _dist, paths = nx.multi_source_dijkstra(G, ex, weight=weight_fn(G, method, fire_active, step_free))

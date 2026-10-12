@@ -160,8 +160,15 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain):
         remaining = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult)
         book_path(G, res, a.path[a.idx + 1:], now + remaining, a.speed_mult)
 
+    # people who ignore guidance are not re-planned, but the planner sees where they are
+    # heading and books their capacity first
+    for a in standing:
+        if not getattr(a, "compliant", True):
+            book_path(G, res, a.path[a.idx:], max(a.start, now), a.speed_mult)
+
     changes = 0
-    for a in sorted(standing, key=lambda a: (max(a.start, now), a.id)):
+    for a in sorted((a for a in standing if getattr(a, "compliant", True)),
+                    key=lambda a: (max(a.start, now), a.id)):
         node = a.path[a.idx]
         t0 = max(a.start, now)
         cur = a.path[a.idx:]

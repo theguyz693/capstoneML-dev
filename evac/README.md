@@ -13,6 +13,9 @@ python -m evac.summarize results/session2_runs.csv      # means, 95% CIs, paired
 python -m evac.verification                             # simulator sanity tests -> docs/verification/
 python tests/test_evac_session1.py                      # safety + reproducibility checks
 python tests/test_evac_session2.py                      # verification + reactive method checks
+python tests/test_evac_session3.py                      # planner checks
+python tests/test_evac_session4.py                      # behaviour + spreading fire checks
+python -m evac.delay_model                              # ML: generate simulator data, train, compare vs formula (needs scikit-learn)
 ```
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
 
@@ -30,6 +33,7 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `planner.py` | Capacity booking (CCRP) and rolling-horizon re-planning with anti-oscillation rules. |
 | `optimum.py` | Theoretical lower bound via max-flow on a time-expanded network. |
 | `physics.py` | Speed–density relation and each edge's sustainable flow (used by simulator and planner). |
+| `delay_model.py` | Learned edge-delay predictor trained on simulator data; scenario/fire-location splits vs formulas. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.
@@ -61,10 +65,23 @@ The graph is 452 nodes / 637 edges.
 All values in `config.py` are engineering assumptions (SFPE flow rates, Weidmann
 speed–density relation), not measurements of this building.
 
+## Scenario options (Session 4)
+| Key | Meaning |
+| --- | --- |
+| `compliance` | share of people who follow guidance (default 1.0) |
+| `herding` | chance a non-compliant person copies the majority exit of the queue they join |
+| `familiar_exit` | where non-compliant people go (default `north main entrance`) |
+| `fires[].spread_m_per_s`, `max_radius` | a fire that grows over time; smoke climbs stair shafts 30 s per floor |
+| `log_edges` | record every edge crossing (features + actual time) for the ML model |
+
 ## Findings so far (preliminary, see `docs/`)
 - Smarter routing only matters when crowds are concentrated (a full hall or floor). Spread over 7 floors, all methods tie.
 - Reactive rerouting helps but oscillates: ~1,000 route changes for 120 people in the seminar-hall case.
 - Capacity booking cuts last-out time by ~35–40% in concentrated scenarios with almost no route changes.
 - **A short prediction horizon is worse than no prediction** (30–60 s horizons lost to plain routing); ≥ 300 s works.
+- **Re-planning earns its place when people disobey or the fire grows**: at 60-80% compliance look-ahead beats a
+  one-shot plan by 10-20%; in a spreading fire it cuts smoke exposure by ~60-70%.
+- **The ML model now earns its place**: predicting real edge delay, it beats a queueing formula by ~40% MAE on
+  crowded edges in unseen scenarios and fire locations.
 - Stairs are the true bottleneck: under the speed–density model a 1.2 m stair sustains ~0.7 persons/s, about half
   its nominal door-style flow. The planner must use this sustainable capacity or it overbooks stairs.
