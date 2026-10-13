@@ -211,3 +211,78 @@ def figure(name: str):
     if name not in {f for f, _, _ in FIGURES + HOSPITAL_FIGURES}:
         raise HTTPException(404, "unknown figure")
     return FileResponse(os.path.join(ROOT, "docs", "figures", name), media_type="image/png")
+
+
+# ------------------------------------------------------------------ what-if (Session 8)
+@router.get("/whatif/elements")
+def whatif_elements(building: str = "campus"):
+    """Elements a building manager can take out of service: whole stairwells, the ramp, exit doors."""
+    from .weakspots import candidates, _label
+    G = G0(building)
+    out = []
+    for kind, edges in candidates(G):
+        if kind == "corridor":
+            continue
+        out.append({"id": f"{kind}:{_label(G, edges, kind)}", "label": _label(G, edges, kind).replace("g_", ""),
+                    "kind": kind, "edges": [list(e) for e in edges]})
+    return out
+
+
+class WhatIfRequest(BaseModel):
+    building: str = "campus"
+    scenario: str = "floor3_full_200"
+    people_factor: float = 1.0               # 0.5 = half the people, 2 = double
+    blocked: List[str] = []                  # ids from /whatif/elements
+    fire_node: Optional[str] = None
+    no_fire: bool = False
+    seeds: int = 2
+
+
+@router.post("/whatif")
+def whatif(req: WhatIfRequest):
+    import statistics
+    from .fixed_plan import _scaled
+    G = G0(req.building)
+    scen = _scenarios(req.building)
+    if req.scenario not in scen:
+        raise HTTPException(400, f"unknown scenario {req.scenario}")
+    if not 0.1 <= req.people_factor <= 3.0 or not 1 <= req.seeds <= 5:
+        raise HTTPException(400, "people_factor 0.1-3, seeds 1-5")
+    sc = _scaled(scen[req.scenario], req.people_factor, with_fire=True)
+    for k in ("compliance", "herding", "familiar_exit"):
+        if k in scen[req.scenario]:
+            sc[k] = scen[req.scenario][k]
+    if req.no_fire:
+        sc["fires"] = []
+    elif req.fire_node:
+        if req.fire_node not in G:
+            raise HTTPException(400, f"unknown node {req.fire_node}")
+        sc["fires"] = [{"node": req.fire_node, "radius": 400, "intensity": 1.0}]
+    elems = {e["id"]: e for e in whatif_elements(req.building)}
+    bad = [b for b in req.blocked if b not in elems]
+    if bad:
+        raise HTTPException(400, f"unknown element {bad[0]}")
+    Gb = G.copy()
+    for b in req.blocked:
+        Gb.remove_edges_from([tuple(e) for e in elems[b]["edges"]])
+
+    def measure(graph):
+        out = {}
+        for m in ("safe_shortest", "lookahead"):
+            runs = [run(graph.copy(), sc, m, s) for s in range(req.seeds)]
+            ms = [r[0] for r in runs]
+            peaks = {}
+            for x in ms:
+                for n, q in x["queue_peaks"].items():
+                    peaks[n] = max(peaks.get(n, 0), q)
+            last = [x["evac_time_last_s"] for x in ms if x["evac_time_last_s"] is not None]
+            out[m] = {"last": round(statistics.mean(last), 1) if last else None,
+                      "mean": round(statistics.mean(x["evac_time_mean_s"] for x in ms if x["evac_time_mean_s"]), 1),
+                      "exposed": round(statistics.mean(x["exposed_agents"] for x in ms), 1),
+                      "cut_off": round(statistics.mean(x["needs_assistance"] + x["stranded"] + x["timed_out"] for x in ms), 1),
+                      "people": ms[0]["n_agents"],
+                      "jams": sorted(peaks.items(), key=lambda kv: -kv[1])[:6]}
+        return out
+    return {"baseline": measure(G), "modified": measure(Gb), "blocked_edges": [e for b in req.blocked for e in elems[b]["edges"]],
+            "people": sc.get("n_agents") or sum(g["n"] for g in sc.get("groups", [])),
+            "fires": sc.get("fires", [])}

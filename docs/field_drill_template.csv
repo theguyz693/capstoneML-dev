@@ -1,0 +1,2 @@
+date,building,room,people,door_width_m,exit_used,first_out_room_s,last_out_room_s,last_out_building_s,notes
+2026-10-20,campus,f1_sem hall 1,60,1.0,north entrance/exit,,,,example row - fill in the measured times

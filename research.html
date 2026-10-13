@@ -80,6 +80,7 @@
   <div class="tab on" data-tab="race">Method race</div>
   <div class="tab" data-tab="signs">Kiosk signs</div>
   <div class="tab" data-tab="weak">Weak spots</div>
+  <div class="tab" data-tab="whatif">What-if</div>
   <div class="tab" data-tab="results">Results</div>
 </div>
 
@@ -169,6 +170,34 @@
   <div class="main">
     <div class="mp"><canvas id="weakCanvas" height="520"></canvas></div>
     <div class="card"><table id="weakTable"></table></div>
+  </div>
+</div>
+
+<!-- ===================== WHAT-IF ===================== -->
+<div class="wrap hidden" id="tab-whatif">
+  <div class="card">
+    <h3>What if...</h3>
+    <div class="desc">For building managers and fire officers: take parts of the building out of service, change the
+      number of people, add a fire - and see the effect on evacuation at once (shortest path vs our planner).</div>
+    <label>Situation</label>
+    <select id="wiScen"></select>
+    <label>People: <b id="wiPeopleV">100%</b> of the normal number</label>
+    <input type="range" id="wiPeople" min="0.5" max="2" step="0.1" value="1">
+    <label>Out of service (locked, blocked or smoke-logged)</label>
+    <div class="checks" id="wiElems"></div>
+    <label>Fire</label>
+    <select id="wiFire"><option value="">situation default</option><option value="__none">no fire</option></select>
+    <button id="wiRun">Compare with normal</button>
+    <div class="desc" id="wiStatus"></div>
+  </div>
+  <div class="main">
+    <div class="card">
+      <div class="bar"><span class="desc" style="margin:0">Red = out of service. Orange circles = where queues build up
+        with the change (bigger = longer queue), shortest-path routing.</span><div class="fl" id="wiFloorBtns" style="margin-left:auto"></div></div>
+    </div>
+    <div class="mp"><canvas id="wiCanvas" height="520"></canvas></div>
+    <div class="card"><h3>Normal vs with the change</h3><table id="wiTable"></table>
+      <div class="desc" id="wiNote" style="margin-top:8px"></div></div>
   </div>
 </div>
 
@@ -447,12 +476,77 @@ function drawWeak() {
 // ------------------------------------------------ init
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
-  for (const k of ["race", "signs", "weak", "results"]) $(`tab-${k}`).classList.toggle("hidden", t.dataset.tab !== k);
+  for (const k of ["race", "signs", "weak", "whatif", "results"]) $(`tab-${k}`).classList.toggle("hidden", t.dataset.tab !== k);
+  if (t.dataset.tab === "whatif") { loadWhatIfElems(); drawWhatIf(); }
   if (t.dataset.tab === "results" && !resultsLoaded) loadResults();
   if (t.dataset.tab === "signs" && !signs) loadSigns();
   if (t.dataset.tab === "weak" && !weak) loadWeak();
   if (t.dataset.tab === "race" && result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); }
 });
+
+// ------------------------------------------------ what-if
+let wiFloor = 0, wiRes = null, wiElemsFor = null;
+async function loadWhatIfElems() {
+  if (wiElemsFor === BLD) return;
+  wiElemsFor = BLD;
+  const els = await (await fetch(`${API}/whatif/elements${q()}`)).json();
+  $("wiElems").innerHTML = els.map(e => `<label><input type="checkbox" value="${esc(e.id)}"> ${esc(e.label)}</label>`).join("");
+  $("wiScen").innerHTML = Object.keys(scen).map(k => `<option value="${k}">${esc(scen[k].description || k).slice(0, 70)}</option>`).join("");
+  $("wiScen").value = BLD === "hospital" ? "hosp_day_fire_stairs1_f2" : "floor3_full_200";
+  const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
+  $("wiFire").innerHTML = `<option value="">situation default</option><option value="__none">no fire</option>` + junctions.map(j => `<option>${j}</option>`).join("");
+  floorButtons($("wiFloorBtns"), f => { wiFloor = f; drawWhatIf(); }, wiFloor);
+}
+function drawWhatIf() {
+  if (!B) return;
+  const v = fitCanvas($("wiCanvas")), hl = {}, hn = {};
+  (wiRes ? wiRes.blocked_edges : []).forEach(([u, w]) => { hl[`${u}|${w}`] = hl[`${w}|${u}`] = "#ef4444"; hn[u] = hn[w] = "#ef4444"; });
+  drawPlan(v, wiFloor, {}, { highlight: hl, highlightNode: hn });
+  if (!wiRes) return;
+  const { ctx, P } = v;
+  for (const [n, qv] of wiRes.modified.safe_shortest.jams) {
+    const node = NB[n]; if (!node || node.floor !== wiFloor) continue;
+    const [x, y] = P(node.x, node.y);
+    ctx.fillStyle = "rgba(245,158,11,0.35)"; ctx.strokeStyle = "#f59e0b";
+    ctx.beginPath(); ctx.arc(x, y, 6 + 2.2 * Math.sqrt(qv), 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#e6edf7"; ctx.font = "11px sans-serif"; ctx.fillText(`${qv} queued`, x + 10, y - 8);
+  }
+}
+async function runWhatIf() {
+  const blocked = [...document.querySelectorAll("#wiElems input:checked")].map(i => i.value);
+  const body = { building: BLD, scenario: $("wiScen").value, people_factor: Number($("wiPeople").value), blocked };
+  const f = $("wiFire").value;
+  if (f === "__none") body.no_fire = true; else if (f) body.fire_node = f;
+  $("wiRun").disabled = true; $("wiStatus").textContent = "Simulating normal and changed building (about 10-20 s)...";
+  try {
+    const res = await fetch(`${API}/whatif`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(await res.text());
+    wiRes = await res.json();
+    const row = (lab, a, b, unit, worseIsHigher = true) => {
+      const d = (a == null || b == null) ? "" : (b - a);
+      const bad = d !== "" && (worseIsHigher ? d > 0.5 : d < -0.5);
+      return `<td>${lab}</td><td>${a ?? "-"}${unit}</td><td class="${bad ? "" : "best"}" style="${bad ? "color:var(--red);font-weight:700" : ""}">${b ?? "-"}${unit}${d !== "" && Math.abs(d) > 0.5 ? ` (${d > 0 ? "+" : ""}${Math.round(d * 10) / 10})` : ""}</td>`;
+    };
+    let html = `<tr><th>Routing</th><th>Measure</th><th>Normal</th><th>With the change</th></tr>`;
+    for (const m of ["safe_shortest", "lookahead"]) {
+      const A = wiRes.baseline[m], Bm = wiRes.modified[m];
+      const lost = Bm.cut_off > A.cut_off + 0.5;
+      const outRow = lost
+        ? `<td>Everyone out</td><td>${A.last} s</td><td style="color:var(--amber);font-weight:700">${Bm.last} s - only the people who CAN get out</td>`
+        : row("Everyone out", A.last, Bm.last, " s");
+      html += `<tr><td rowspan="4" style="color:${LINE[m]};font-weight:700">${LABEL[m]}</td>${outRow}</tr>`;
+      html += `<tr>${row("Average person", A.mean, Bm.mean, " s")}</tr><tr>${row("People exposed to smoke", A.exposed, Bm.exposed, "")}</tr>`;
+      html += `<tr>${row("People with no way out", A.cut_off, Bm.cut_off, "")}</tr>`;
+    }
+    $("wiTable").innerHTML = html;
+    const jam = wiRes.modified.safe_shortest.jams[0];
+    $("wiNote").textContent = `${wiRes.people} people. ` + (jam ? `Worst queue with the change: ${jam[1]} people waiting at ${jam[0]}. ` : "") +
+      "Everyone-out time counts only people who get out - read it together with 'no way out'.";
+    $("wiStatus").textContent = "Done.";
+    drawWhatIf();
+  } catch (e) { $("wiStatus").textContent = "Error: " + e.message; }
+  $("wiRun").disabled = false;
+}
 
 // ------------------------------------------------ results
 let resultsLoaded = false;
@@ -492,7 +586,9 @@ async function loadBuilding() {
   $("panels").innerHTML = ""; $("score").innerHTML = ""; $("status").textContent = "";
   $("weakTable").innerHTML = ""; $("findings").innerHTML = ""; $("figs").innerHTML = "";
   const on = document.querySelector(".tab.on").dataset.tab;
+  wiRes = null; wiFloor = 0; $("wiTable").innerHTML = ""; $("wiNote").textContent = "";
   if (on === "signs") loadSigns(); if (on === "weak") loadWeak(); if (on === "results") loadResults();
+  if (on === "whatif") { await loadWhatIfElems(); drawWhatIf(); }
 }
 
 (async function init() {
@@ -505,6 +601,8 @@ async function loadBuilding() {
   $("runBtn").onclick = runRace; $("play").onclick = play;
   $("scrub").oninput = e => { frameIdx = Number(e.target.value); drawFrame(); };
   $("bld").onchange = () => { if (playing) play(); BLD = $("bld").value; loadBuilding(); };
+  $("wiRun").onclick = runWhatIf;
+  $("wiPeople").oninput = () => $("wiPeopleV").textContent = Math.round($("wiPeople").value * 100) + "%";
   window.addEventListener("resize", () => { if (result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); } });
   await loadBuilding();
 })();

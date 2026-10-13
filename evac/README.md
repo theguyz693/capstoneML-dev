@@ -66,6 +66,15 @@ python tests/test_evac_session7.py
   `refuge` (move a compartment to a safe place in the building), `in_place` (defend in place), `staff`
   (beds need 2 staff, who walk back for the next bed).
 - `config.DELAY_MODEL = "v2"` switches the learned planner to the two-building model.
+
+### Session 8: validation and the what-if page
+```bash
+python -m evac.validation                       # vs lab door flows, NIST stair speeds, IMO tests -> docs/validation.md
+python -m evac.validation --drill data/field_drills.csv   # after a timed real drill (docs/field_validation_protocol.md)
+python tests/test_evac_session8.py
+```
+Dashboard **What-if** tab (`/api/research/whatif`): take stairwells / the ramp / exit doors out of service, change
+the number of people, add a fire - compare with the normal building (shortest path vs look-ahead), with queue hot-spots.
 Hospital scenarios use `"spawn": "groups"` with occupant profiles (`config.PROFILES`: walk, slow, wheelchair,
 bed - speed, stairs allowed, capacity used, preparation time). New edge type `ramp` (step-free, usable in a fire).
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
@@ -95,6 +104,7 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `final_experiments.py` / `final_report.py` | Final experiment matrix and the report generator. |
 | `hospital.py` | Imports the team's hospital drawings data (scale from the 54,675 mm dimension, floors aligned on shared shafts), loads it, hospital scenarios. |
 | `fixed_plan.py` / `knowledge.py` / `session7.py` | Printed plans, imperfect knowledge of where people are, hospital procedures (Session 7). |
+| `validation.py` | Validation against published measurements, IMO MSC.1/Circ.1533 tests, field-drill comparison (Session 8). |
 | `ml_transfer.py` | Transfer of the learned model between buildings; two-building model v2 (Session 7). |
 | `hospital_experiments.py` / `hospital_report.py` | Session 6 experiments on the hospital + patient groups, ramp weak spot, hospital assumptions. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
