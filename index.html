@@ -1,97 +1,364 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>3D Campus Map</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evacuation 3D Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-dark: #080c16;
+            --header-bg: rgba(11, 16, 28, 0.92);
+            --sidebar-bg: rgba(13, 19, 34, 0.88);
+            --panel-bg: rgba(15, 23, 42, 0.78);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --panel-border-glow: rgba(59, 130, 246, 0.3);
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-red: #ef4444;
+            --accent-orange: #f97316;
+            --accent-green: #10b981;
+            --accent-yellow: #eab308;
+            --accent-purple: #8b5cf6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body { 
             margin: 0; 
             overflow: hidden; 
-            background-color: #0d1424; 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            color: #060f18;
+            background-color: var(--bg-dark); 
+            font-family: var(--font-sans); 
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
         }
 
-        #canvas-container { 
-            width: 100vw; 
-            height: 100vh; 
-        }
-
-        /* Dark Glassmorphism Panel */
-        #ui { 
-            position: absolute; 
-            top: 20px; 
-            left: 20px; 
-            background: rgba(12, 16, 27, 0.7); 
-            backdrop-filter: blur(16px); 
+        /* ── TOP PLATFORM COMMAND HEADER ── */
+        .platform-header {
+            height: 60px;
+            background: var(--header-bg);
+            backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            padding: 24px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            max-width: 320px;
-            width: 100%;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
-            z-index: 10;
+            border-bottom: 1px solid var(--panel-border);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 110;
+            position: relative;
+            pointer-events: auto;
         }
 
-        /* Make text inside the UI look good on dark */
-        #ui h3 { color: #fff; margin: 0 0 15px 0; font-weight: 600; letter-spacing: 0.5px;}
-        #ui h4 { color: #cbd5e1; margin: 0 0 10px 0; font-weight: 500; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px;}
-        #ui p { color: #cbd5e1; }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
 
+        .brand-logo-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+
+        .brand-logo-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: white;
+            stroke-width: 2.2;
+        }
+
+        .brand-title-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-name {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-sub {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .header-status-group {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: statusPulse 2s infinite;
+        }
+
+        @keyframes statusPulse {
+            50% { opacity: 0.4; }
+        }
+
+        .status-badge.alert-active {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+
+        .status-badge.alert-active .status-dot {
+            background: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+
+        .header-clock {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        /* ── MAIN WORKSPACE LAYOUT ── */
+        .platform-workspace {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ── LEFT NAVIGATION SIDEBAR ── */
+        .sidebar-nav {
+            width: 76px;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 8px;
+            position: relative;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .nav-item {
+            width: 56px;
+            height: 54px;
+            border-radius: 12px;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            pointer-events: auto;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.18);
+            color: var(--accent-cyan);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-cyan);
+            border-radius: 0 4px 4px 0;
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+            pointer-events: none;
+        }
+
+        .nav-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        /* ── FLOATING OPERATING CONTROL DRAWER PANEL ── */
+        .panel-drawer {
+            width: 360px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-right: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 90;
+            pointer-events: auto;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .panel-drawer.collapsed {
+            transform: translateX(-360px);
+            position: absolute;
+        }
+
+        .drawer-section {
+            display: none;
+            padding: 20px;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .drawer-section.active {
+            display: flex;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .section-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Controls & Form Inputs Styling */
         input[type="text"] {
-            padding: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 12px;
+            border: 1px solid var(--panel-border);
             border-radius: 8px;
             outline: none;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.35);
             color: white;
-            font-size: 0.9em;
+            font-size: 0.88rem;
+            font-family: var(--font-sans);
+            width: 100%;
+            transition: all 0.2s;
+            pointer-events: auto;
         }
         
         input[type="text"]::placeholder { color: #64748b; }
-        input[type="text"]:focus { border-color: #3b82f6; background: rgba(0, 0, 0, 0.5); }
+        input[type="text"]:focus { border-color: var(--accent-blue); background: rgba(0, 0, 0, 0.55); box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+
+        select {
+            padding: 10px 12px;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.4);
+            color: white;
+            font-size: 0.88rem;
+            font-family: var(--font-sans);
+            width: 100%;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            pointer-events: auto;
+        }
+        select:focus { border-color: var(--accent-blue); }
+        select option { background: #1e293b; color: white; }
 
         button { 
             cursor: pointer; 
-            transition: all 0.2s; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
             border: none; 
             border-radius: 8px; 
             padding: 10px 14px; 
-            font-weight: 600; 
-            font-size: 0.9em;
+            font-weight: 700; 
+            font-size: 0.88rem;
+            font-family: var(--font-sans);
+            pointer-events: auto;
         }
         
         button:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+            transform: translateY(-1px); 
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4); 
             filter: brightness(1.1); 
         }
 
-        .nav-btn { background-color: #3b82f6; color: white; width: 100%; margin-top: 10px; }
-        .emergency-btn { background-color: #ef4444; color: white; }
-        .close-btn { background: none; color: #64748b; font-size: 18px; padding: 0; }
-        .close-btn:hover { color: #f8fafc; transform: none; box-shadow: none; }
+        .nav-btn { background-color: var(--accent-blue); color: white; width: 100%; margin-top: 6px; }
+        .emergency-btn { background-color: var(--accent-red); color: white; }
+        .ml-btn { background: linear-gradient(135deg, var(--accent-red), var(--accent-orange)); color: white; width: 100%; margin-top: 10px; font-size: 0.95em; letter-spacing: 0.5px; }
 
-        /* ── ML Feature 1 additions ── */
-        .ml-btn { background: linear-gradient(135deg, #ef4444, #f97316); color: white; width: 100%; margin-top: 10px; font-size: 0.95em; letter-spacing: 0.5px; }
-        select {
-            padding: 9px 10px;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 8px;
-            background: rgba(0,0,0,0.35);
-            color: white;
-            font-size: 0.88em;
-            width: 100%;
-            margin-top: 6px;
-            outline: none;
-            cursor: pointer;
-        }
-        select option { background: #1e293b; color: white; }
+        /* Legacy ML Feature Components */
         #mlMetrics {
             margin-top: 12px;
-            padding: 12px 14px;
-            background: rgba(0,0,0,0.35);
+            padding: 14px;
+            background: rgba(0,0,0,0.4);
             border-radius: 10px;
             border: 1px solid rgba(255,255,255,0.1);
             font-size: 0.82em;
@@ -108,45 +375,210 @@
         .status-safe   { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
         .status-danger { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
         #mlSpinner { display:none; text-align:center; color:#94a3b8; margin-top:8px; font-size:0.82em; }
-        /* Collapsible sub-panels for conditional fields */
+        
         .ml-subpanel { margin-top:8px; padding:10px 12px; background:rgba(0,0,0,0.25); border-radius:8px; border:1px solid rgba(255,255,255,0.07); display:none; }
         .ml-subpanel.visible { display:block; }
         .ml-subpanel label { font-size:0.78em; color:#94a3b8; display:block; margin-top:6px; margin-bottom:2px; }
-        /* Range sliders */
-        input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px; background:rgba(255,255,255,0.15); outline:none; cursor:pointer; }
+        
+        input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px; background:rgba(255,255,255,0.15); outline:none; cursor:pointer; pointer-events:auto; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#f97316; cursor:pointer; }
         .slider-row { display:flex; justify-content:space-between; align-items:center; gap:6px; }
         .slider-val { font-size:0.8em; color:#f97316; font-weight:700; min-width:30px; text-align:right; }
-        /* Accessibility toggle */
+        
         .toggle-row { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
         .toggle-row label { font-size:0.8em; color:#94a3b8; }
-        input[type=checkbox] { width:16px; height:16px; accent-color:#f97316; cursor:pointer; }
+        input[type=checkbox] { width:16px; height:16px; accent-color:#f97316; cursor:pointer; pointer-events:auto; }
         #mlMetrics .metric-row.echo { border-top:1px solid rgba(255,255,255,0.06); padding-top:4px; margin-top:4px; }
+
+        /* Overview & Stat Card Components */
+        .stat-card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-tile {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .stat-val {
+            font-size: 1.35rem;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            color: #ffffff;
+            margin-top: 4px;
+        }
+
+        .stat-lbl {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .log-box {
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 10px;
+            border-radius: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            max-height: 140px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* ── 3D CANVAS & VIEWPORT ── */
+        #canvas-container { 
+            flex: 1;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        #canvas-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* ── 3D MULTI-FLOOR FILTER BAR ── */
+        #floorFilterBar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(12, 16, 27, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 8px 12px;
+            border-radius: 14px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.55);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            z-index: 80;
+            pointer-events: auto;
+            user-select: none;
+        }
+        .floor-pill {
+            background: rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
+            padding: 6px 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+        }
+        .floor-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #f8fafc;
+            transform: translateY(-1px);
+        }
+        .floor-pill.active {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.45);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .view-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #cbd5e1;
+            padding: 6px 10px;
+            font-size: 0.76em;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-left: 4px;
+            pointer-events: auto;
+        }
+        .view-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        /* ── 3D HOVER TOOLTIP ── */
+        #nodeTooltip {
+            position: fixed;
+            display: none;
+            pointer-events: none;
+            background: rgba(10, 15, 29, 0.92);
+            backdrop-filter: blur(10px);
+            color: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            z-index: 95;
+            line-height: 1.4;
+            max-width: 220px;
+        }
 
         /* ── 2D FLOOR-BY-FLOOR EVACUATION TRAY ── */
         #evac2dTray {
             position: absolute;
             bottom: 20px;
-            left: 20px;
+            left: 450px;
             right: 20px;
             max-height: 380px;
-            background: rgba(12, 16, 27, 0.88);
+            background: rgba(12, 16, 27, 0.92);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
             padding: 16px 20px;
             border-radius: 16px;
-            box-shadow: 0 12px 48px rgba(0,0,0,0.65);
+            box-shadow: 0 12px 48px rgba(0,0,0,0.7);
             border: 1px solid rgba(255, 255, 255, 0.12);
-            z-index: 12;
+            z-index: 85;
+            pointer-events: auto;
             display: none;
             flex-direction: column;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         #evac2dTray.minimized {
             max-height: 48px;
             padding-bottom: 8px;
             overflow: hidden;
         }
+
+        /* 2D MAXIMIZED OVERLAY VIEW */
+        #evac2dTray.maximized {
+            position: fixed;
+            top: 76px;
+            left: 376px;
+            right: 20px;
+            bottom: 20px;
+            max-height: calc(100vh - 96px);
+            z-index: 120;
+            background: rgba(8, 12, 22, 0.96);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.85);
+            border-color: rgba(59, 130, 246, 0.4);
+            overflow: hidden;
+        }
+
+        #evac2dTray.maximized .floor-strip {
+            flex-wrap: wrap;
+            max-height: calc(100vh - 180px);
+            overflow-y: auto;
+            gap: 20px;
+            padding-right: 8px;
+        }
+
+        #evac2dTray.maximized .floor-card {
+            flex: 0 0 calc(50% - 10px);
+            min-width: 420px;
+        }
+
+        #evac2dTray.maximized .canvas-wrapper {
+            height: 320px;
+        }
+
         .tray-header {
             display: flex;
             justify-content: space-between;
@@ -173,6 +605,7 @@
             padding: 4px 10px;
             font-size: 0.78em;
             border-radius: 6px;
+            pointer-events: auto;
         }
         .tray-btn:hover {
             background: rgba(255,255,255,0.2);
@@ -185,7 +618,7 @@
             padding-bottom: 8px;
             scroll-behavior: smooth;
         }
-        .floor-strip::-webkit-scrollbar { height: 6px; }
+        .floor-strip::-webkit-scrollbar { height: 6px; width: 6px; }
         .floor-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
         .floor-card {
             flex: 0 0 380px;
@@ -280,265 +713,936 @@
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .legend-dot { width: 9px; height: 9px; border-radius: 50%; }
 
-        /* ── 3D MULTI-FLOOR FILTER BAR & CONTROLS ── */
-        #floorFilterBar {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(12, 16, 27, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            padding: 8px 12px;
-            border-radius: 14px;
-            box-shadow: 0 10px 35px rgba(0,0,0,0.55);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            display: flex;
-            gap: 6px;
-            align-items: center;
-            z-index: 10;
-            user-select: none;
-        }
-        .floor-pill {
-            background: rgba(255, 255, 255, 0.08);
-            color: #94a3b8;
-            padding: 6px 12px;
-            font-size: 0.8em;
-            font-weight: 600;
-            border-radius: 8px;
-            border: 1px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .floor-pill:hover {
-            background: rgba(255, 255, 255, 0.18);
-            color: #f8fafc;
-            transform: translateY(-1px);
-        }
-        .floor-pill.active {
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            color: #ffffff;
-            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.45);
-            border-color: rgba(255, 255, 255, 0.25);
-        }
-        #nodeTooltip {
-            position: fixed;
-            display: none;
-            pointer-events: none;
-            background: rgba(10, 15, 29, 0.92);
-            backdrop-filter: blur(10px);
-            color: #f8fafc;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 0.8em;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            z-index: 30;
-            line-height: 1.4;
-            max-width: 220px;
-        }
-        .view-btn {
-            background: rgba(255, 255, 255, 0.05);
-            color: #cbd5e1;
-            padding: 6px 10px;
-            font-size: 0.76em;
-            border-radius: 6px;
+        /* Mockup Preview Cards & Frame Container */
+        .mockup-preview-card {
+            background: rgba(0,0,0,0.35);
             border: 1px solid rgba(255,255,255,0.08);
-            margin-left: 4px;
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: auto;
         }
-        .view-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        .mockup-preview-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .mockup-preview-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .btn-launch-mockup {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-align: center;
+            display: inline-block;
+            pointer-events: auto;
+        }
+
+        .mockup-iframe {
+            width: 100%;
+            height: 240px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            background: #000;
+        }
+
+        /* Live Crowd Monitoring Node Card */
+        .crowd-node-card {
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .crowd-node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .crowd-node-bar-container {
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .crowd-node-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 3px;
+            transition: width 0.2s ease, background-color 0.2s ease;
+        }
+
+        .crowd-node-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+        }
+
+        /* ── REDESIGN ADDITIONS ── */
+        .bldg-switch { display:flex; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:3px; gap:3px; }
+        .bldg-switch button { background:transparent; border:0; color:var(--text-muted); font-weight:700; font-size:0.78rem; padding:7px 12px; border-radius:7px; cursor:pointer; width:auto; margin:0; }
+        .bldg-switch button:hover { color:#fff; background:rgba(255,255,255,0.06); }
+        .bldg-switch button.active { background:linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); color:#fff; box-shadow:0 4px 14px rgba(6,182,212,0.3); }
+        .lab-link { color:#c4b5fd; border:1px solid rgba(139,92,246,0.45); background:rgba(139,92,246,0.12); padding:7px 12px; border-radius:9px; font-size:0.78rem; font-weight:700; text-decoration:none; white-space:nowrap; }
+        .lab-link:hover { background:rgba(139,92,246,0.25); color:#fff; }
+        .nav-item.nav-link { margin-top:auto; text-decoration:none; }
+        .bldg-chip { display:inline-block; font-size:0.68rem; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; padding:3px 8px; border-radius:6px; background:rgba(6,182,212,0.12); color:var(--accent-cyan); border:1px solid rgba(6,182,212,0.3); }
+        .findings { display:flex; flex-direction:column; gap:8px; }
+        .finding { font-size:0.78rem; line-height:1.45; color:#cbd5e1; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.07); border-left:3px solid var(--accent-cyan); border-radius:8px; padding:9px 11px; }
+        .finding b { color:#fff; }
+        .muted-note { font-size:0.75rem; color:var(--text-muted); line-height:1.45; }
+        .muted-note code { background:rgba(255,255,255,0.08); padding:1px 5px; border-radius:4px; color:#e2e8f0; }
+        .btn-row { display:flex; gap:6px; }
+        .btn-row > * { flex:1; }
+        .ghost-btn { background:rgba(255,255,255,0.06); color:#e2e8f0; border:1px solid rgba(255,255,255,0.14); width:100%; margin-top:0; text-align:center; text-decoration:none; padding:10px; border-radius:8px; font-weight:600; font-size:0.85em; cursor:pointer; }
+        .ghost-btn:hover { background:rgba(255,255,255,0.12); }
+        .field-label { font-size:0.8em; color:#94a3b8; display:block; margin-top:8px; margin-bottom:2px; }
+        .pick-hint { font-size:0.72rem; color:#64748b; margin-top:2px; }
+        #legend3d { position:absolute; left:450px; bottom:20px; z-index:80; background:rgba(12,16,27,0.85); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px 12px; font-size:0.72rem; color:#cbd5e1; display:grid; grid-template-columns:auto auto; gap:5px 14px; box-shadow:0 10px 30px rgba(0,0,0,0.5); user-select:none; }
+        #legend3d .lg-title { grid-column:1 / -1; font-weight:800; color:#64748b; letter-spacing:0.6px; font-size:0.68rem; }
+        #legend3d .lg { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+        #legend3d .sw { width:11px; height:11px; border-radius:50%; flex:none; }
+        #legend3d .sw.sq { border-radius:3px; }
+        #legend3d .sw.bar { width:16px; height:4px; border-radius:2px; }
+        #toast { position:absolute; left:50%; top:84px; transform:translateX(-50%); z-index:96; background:rgba(12,16,27,0.94); border:1px solid rgba(6,182,212,0.45); color:#e2e8f0; padding:8px 14px; border-radius:10px; font-size:0.8rem; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.5); }
+        @media (max-width: 1100px) { .brand-sub { display:none; } .lab-link { display:none; } }
     </style>
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="campus_data.js"></script>
+    <script>
+        // Which building to show: /?building=hospital loads the hospital graph, anything else the campus.
+        window.BUILDING = (new URLSearchParams(location.search).get('building') === 'hospital') ? 'hospital' : 'campus';
+        document.write('<script src="' + (window.BUILDING === 'hospital' ? '/static/hospital_data.js' : 'campus_data.js') + '"><\/script>');
+    </script>
 </head>
 <body>
-    <button id="showMenuBtn" onclick="toggleUI()" style="display: none;">☰ Open Controls</button>
 
-    <div id="ui">
-        <div class="ui-header">
-            <h3 style="margin: 0;">Campus Navigation</h3>
-            <button class="close-btn" onclick="toggleUI()">✖</button>
-        </div>
-        
-        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-            <input type="text" id="startInput" placeholder="Start (e.g. j1)" style="flex: 1;">
-            <input type="text" id="endInput" placeholder="End (e.g. f1_lab)" style="flex: 1;">
-        </div>
-        <button class="nav-btn" onclick="runNavigation()">Navigate</button>
-        
-        <hr style="margin: 15px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.08);">
-
-        <h4 style="margin: 0 0 4px 0; color: #f97316;">&#x1F9E0; ML Evacuation (Feature 1)</h4>
-        <p style="font-size:0.75em; color:#64748b; margin: 0 0 8px 0;">Routes via Random Forest + Dijkstra</p>
-
-        <!-- ── 1. ORIGIN ─────────────────────────────────────── -->
-        <label style="font-size:0.8em; color:#94a3b8;">Origin Node</label>
-        <select id="mlOrigin" style="margin-top:4px;">
-            <option value="">Loading nodes…</option>
-        </select>
-
-        <!-- ── 2. EMERGENCY TYPE ──────────────────────────────── -->
-        <label style="font-size:0.8em; color:#94a3b8; margin-top:8px; display:block;">Emergency Type</label>
-        <select id="mlEmergencyType" onchange="onEmergencyTypeChange()">
-            <option value="normal">Normal — No Emergency</option>
-            <option value="fire" selected>Fire / Hazard</option>
-            <option value="crowd">Crowd Congestion</option>
-            <option value="accessibility">Accessibility / Mobility-Impaired</option>
-            <option value="multifloor_fire">Multi-Floor: Stairwell Blocked</option>
-        </select>
-
-        <!-- ── 3. FIRE / HAZARD sub-panel ─────────────────────── -->
-        <div id="fireSub" class="ml-subpanel visible">
-            <label>Hazard Location (node)</label>
-            <select id="mlHazardNode">
-                <option value="">Loading junctions…</option>
-            </select>
-            <label>Hazard Intensity</label>
-            <div class="slider-row">
-                <input type="range" id="mlHazardIntensity" min="0" max="1" step="0.05" value="1.0"
-                    oninput="document.getElementById('mlHazardIntensityVal').textContent = parseFloat(this.value).toFixed(2);">
-                <span class="slider-val" id="mlHazardIntensityVal">1.00</span>
+    <!-- ── PLATFORM HEADER ── -->
+    <header class="platform-header">
+        <div class="header-brand">
+            <div class="brand-logo-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             </div>
-            <label>Hazard Radius (graph units)</label>
-            <div class="slider-row">
-                <input type="range" id="mlHazardRadius" min="50" max="1000" step="10" value="280"
-                    oninput="document.getElementById('mlHazardRadiusVal').textContent = this.value;">
-                <span class="slider-val" id="mlHazardRadiusVal">280</span>
+            <div class="brand-title-group">
+                <div class="brand-name">CAPSTONE-TEAM212</div>
+                <div class="brand-sub" id="brandSub">Emergency Evacuation Platform</div>
             </div>
         </div>
 
-        <!-- ── 4. CROWD sub-panel ──────────────────────────────── -->
-        <div id="crowdSub" class="ml-subpanel">
-            <label>Crowd Hotspot (node)</label>
-            <select id="mlCrowdNode">
-                <option value="">Loading junctions…</option>
-            </select>
-            <label>Crowd Intensity</label>
-            <div class="slider-row">
-                <input type="range" id="mlCrowdIntensity" min="0" max="1" step="0.05" value="0.95"
-                    oninput="document.getElementById('mlCrowdIntensityVal').textContent = parseFloat(this.value).toFixed(2);">
-                <span class="slider-val" id="mlCrowdIntensityVal">0.95</span>
+        <div class="header-status-group">
+            <div class="bldg-switch" id="bldgSwitch" title="Switch building">
+                <button data-b="campus" onclick="switchBuilding('campus')">🏫 Campus · G+6</button>
+                <button data-b="hospital" onclick="switchBuilding('hospital')">🏥 Hospital · G+3</button>
             </div>
-            <label>Crowd Radius (graph units)</label>
-            <div class="slider-row">
-                <input type="range" id="mlCrowdRadius" min="50" max="1000" step="10" value="300"
-                    oninput="document.getElementById('mlCrowdRadiusVal').textContent = this.value;">
-                <span class="slider-val" id="mlCrowdRadiusVal">300</span>
+            <a class="lab-link" href="/research" target="_blank" title="Method race, kiosk signs, weak spots, what-if, results">🔬 Research Lab ↗</a>
+            <div class="status-badge" id="platformStatusBadge">
+                <span class="status-dot"></span>
+                <span id="platformStatusText">SYSTEM OPERATIONAL</span>
+            </div>
+            <div class="header-clock" id="headerClock">02:45:14 PM</div>
+        </div>
+    </header>
+
+    <!-- ── PLATFORM MAIN WORKSPACE ── -->
+    <div class="platform-workspace">
+
+        <!-- ── SIDEBAR NAVIGATION ── -->
+        <nav class="sidebar-nav">
+            <div class="nav-item active" onclick="switchSection('overview')" id="tab-overview">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Overview</span>
+            </div>
+            <div class="nav-item" onclick="switchSection('navigation')" id="tab-navigation">
+                <span class="nav-icon">🧭</span>
+                <span class="nav-label">Nav</span>
+            </div>
+            <div class="nav-item" onclick="switchSection('emergency')" id="tab-emergency">
+                <span class="nav-icon">🚨</span>
+                <span class="nav-label">Evac Route</span>
+            </div>
+            <div class="nav-item" onclick="switchSection('simulation')" id="tab-simulation">
+                <span class="nav-icon">🏃</span>
+                <span class="nav-label">Live Sim</span>
+            </div>
+            <div class="nav-item" onclick="switchSection('building')" id="tab-building">
+                <span class="nav-icon">🏢</span>
+                <span class="nav-label">Floors</span>
+            </div>
+            <a class="nav-item nav-link" href="/research" target="_blank" title="Research Lab (opens in a new tab)">
+                <span class="nav-icon">🔬</span>
+                <span class="nav-label">Lab ↗</span>
+            </a>
+        </nav>
+
+        <!-- ── FLOATING OPERATING CONTROL DRAWER PANEL ── -->
+        <aside class="panel-drawer" id="panelDrawer">
+
+            <!-- 1. OVERVIEW SECTION -->
+            <div class="drawer-section active" id="sec-overview">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">📊 Overview</div>
+                        <div class="section-subtitle" id="ovSub">Building graph</div>
+                    </div>
+                    <span class="bldg-chip" id="ovChip">Campus</span>
+                </div>
+
+                <div class="stat-card-grid">
+                    <div class="stat-tile"><div class="stat-lbl">Graph nodes</div><div class="stat-val" id="ovNodes">–</div></div>
+                    <div class="stat-tile"><div class="stat-lbl">Floors</div><div class="stat-val" id="ovFloors">–</div></div>
+                    <div class="stat-tile"><div class="stat-lbl">Rooms</div><div class="stat-val" id="ovRooms" style="color: var(--accent-cyan);">–</div></div>
+                    <div class="stat-tile"><div class="stat-lbl">Exits</div><div class="stat-val" id="ovExits" style="color: var(--accent-green);">–</div></div>
+                    <div class="stat-tile"><div class="stat-lbl">Stairs · lifts · ramp</div><div class="stat-val" id="ovVert" style="color: var(--accent-yellow); white-space:nowrap;">–</div></div>
+                    <div class="stat-tile"><div class="stat-lbl">Graph links</div><div class="stat-val" id="ovEdges">–</div></div>
+                </div>
+
+                <div>
+                    <div class="stat-lbl" style="margin-bottom: 8px;">Key findings for this building</div>
+                    <div class="findings" id="ovFindings"><div class="muted-note">Loading results…</div></div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="nav-btn" style="margin-top:0" onclick="switchSection('simulation')">🏃 Live simulation</button>
+                    <button class="nav-btn" style="margin-top:0; background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));" onclick="switchSection('emergency')">🚨 Evacuation route</button>
+                </div>
+                <a class="ghost-btn" href="/research" target="_blank">🔬 Open Research Lab — method race, kiosk signs, weak spots, what-if ↗</a>
+
+                <div>
+                    <div class="stat-lbl" style="margin-bottom: 6px;">Activity</div>
+                    <div class="log-box" id="overviewLogBox"></div>
+                </div>
+            </div>
+
+            <!-- 2. POINT-TO-POINT NAVIGATION SECTION -->
+            <div class="drawer-section" id="sec-navigation">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">🧭 Navigation</div>
+                        <div class="section-subtitle">Point-to-Point Wayfinding</div>
+                    </div>
+                </div>
+
+                <label class="field-label" style="margin-top:0">From</label>
+                <input type="text" id="startInput" list="nodeList" placeholder="Type to search, or click a node in 3D" autocomplete="off">
+
+                <label class="field-label">To</label>
+                <input type="text" id="endInput" list="nodeList" placeholder="Type to search, or click a node in 3D" autocomplete="off">
+                <div class="pick-hint">Tip: clicking a node in the 3D view fills the next empty box.</div>
+
+                <div class="btn-row" style="margin-top:6px">
+                    <button class="ghost-btn" onclick="swapNavEnds()">⇅ Swap</button>
+                    <button class="ghost-btn" onclick="clearNav()">✖ Clear</button>
+                </div>
+                <button class="nav-btn" onclick="runNavigation()">Navigate 3D Route</button>
+
+                <p id="pathInfo" style="font-size: 0.85em; margin-top: 12px; word-wrap: break-word; color: #cbd5e1;"></p>
+            </div>
+
+            <!-- 3. EMERGENCY & ML SECTION (PRESERVED FULLY FOR STATIC ANALYSIS) -->
+            <div class="drawer-section" id="sec-emergency">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title" style="color: var(--accent-orange);">🚨 Evacuation Route</div>
+                        <div class="section-subtitle" id="emSub">Random Forest + Dijkstra Optimization</div>
+                    </div>
+                </div>
+
+                <!-- 1. ORIGIN -->
+                <label style="font-size:0.8em; color:#94a3b8;">Origin Node</label>
+                <select id="mlOrigin">
+                    <option value="">Loading nodes…</option>
+                </select>
+
+                <!-- 2. EMERGENCY TYPE -->
+                <label style="font-size:0.8em; color:#94a3b8; margin-top:8px; display:block;">Emergency Type</label>
+                <select id="mlEmergencyType" onchange="onEmergencyTypeChange()">
+                    <option value="normal">Normal — No Emergency</option>
+                    <option value="fire" selected>Fire / Hazard</option>
+                    <option value="crowd" id="optCrowd">Crowd Congestion</option>
+                    <option value="accessibility">Accessibility / Mobility-Impaired</option>
+                    <option value="multifloor_fire">Multi-Floor: Stairwell Blocked</option>
+                </select>
+
+                <!-- 3. FIRE / HAZARD sub-panel -->
+                <div id="fireSub" class="ml-subpanel visible">
+                    <label>Hazard Location (node)</label>
+                    <select id="mlHazardNode">
+                        <option value="">Loading junctions…</option>
+                    </select>
+                    <label>Hazard Intensity</label>
+                    <div class="slider-row">
+                        <input type="range" id="mlHazardIntensity" min="0" max="1" step="0.05" value="1.0"
+                            oninput="document.getElementById('mlHazardIntensityVal').textContent = parseFloat(this.value).toFixed(2);">
+                        <span class="slider-val" id="mlHazardIntensityVal">1.00</span>
+                    </div>
+                    <label>Hazard Radius (graph units)</label>
+                    <div class="slider-row">
+                        <input type="range" id="mlHazardRadius" min="50" max="1000" step="10" value="280"
+                            oninput="document.getElementById('mlHazardRadiusVal').textContent = this.value;">
+                        <span class="slider-val" id="mlHazardRadiusVal">280</span>
+                    </div>
+                </div>
+
+                <!-- 4. CROWD sub-panel -->
+                <div id="crowdSub" class="ml-subpanel">
+                    <label>Crowd Hotspot (node)</label>
+                    <select id="mlCrowdNode">
+                        <option value="">Loading junctions…</option>
+                    </select>
+                    <label>Crowd Intensity</label>
+                    <div class="slider-row">
+                        <input type="range" id="mlCrowdIntensity" min="0" max="1" step="0.05" value="0.95"
+                            oninput="document.getElementById('mlCrowdIntensityVal').textContent = parseFloat(this.value).toFixed(2);">
+                        <span class="slider-val" id="mlCrowdIntensityVal">0.95</span>
+                    </div>
+                    <label>Crowd Radius (graph units)</label>
+                    <div class="slider-row">
+                        <input type="range" id="mlCrowdRadius" min="50" max="1000" step="10" value="300"
+                            oninput="document.getElementById('mlCrowdRadiusVal').textContent = this.value;">
+                        <span class="slider-val" id="mlCrowdRadiusVal">300</span>
+                    </div>
+                </div>
+
+                <!-- 5. ACCESSIBILITY toggle -->
+                <div class="toggle-row">
+                    <label for="mlMobility">♿ Mobility Impaired (step-free route)</label>
+                    <input type="checkbox" id="mlMobility">
+                </div>
+
+                <button class="ml-btn" onclick="runMLEvacuation()" id="mlBtn">⚡ Simulate ML Evacuation</button>
+                <div id="mlSpinner">⏳ Calculating ML route…</div>
+                <div id="mlStatus"></div>
+
+                <div id="mlMetrics">
+                    <div class="metric-row"><span class="label">Recommended Exit</span><span id="mExit">—</span></div>
+                    <div class="metric-row"><span class="label">Physical Dist</span><span id="mDist">—</span></div>
+                    <div class="metric-row"><span class="label">ML Cost</span><span id="mCost">—</span></div>
+                    <div class="metric-row"><span class="label">Peak Hazard</span><span id="mHazard">—</span></div>
+                    <div class="metric-row"><span class="label">Avg Crowd</span><span id="mCrowd">—</span></div>
+                    <div class="metric-row"><span class="label">Path Changed</span><span id="mChanged">—</span></div>
+                    <div class="metric-row echo"><span class="label">↳ Origin used</span><span id="mOriginUsed" style="color:#a5f3fc;">—</span></div>
+                    <div class="metric-row"><span class="label">↳ Hazard node</span><span id="mHazardUsed" style="color:#fca5a5;">—</span></div>
+                    <div class="metric-row"><span class="label">↳ Crowd node</span><span id="mCrowdUsed" style="color:#fde68a;">—</span></div>
+                    <div class="metric-row"><span class="label">↳ Mobility impaired</span><span id="mMobilityUsed">—</span></div>
+                    <div class="route-seq" id="mRoute"></div>
+                </div>
+
+                <hr style="margin: 12px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="section-title" style="font-size: 0.85rem;">🚨 Static Emergency Routing</div>
+                <div class="muted-note" style="margin-top:4px">Plain shortest paths to every exit — the primary in green, alternatives in red.</div>
+                <div style="display: flex; gap: 5px; margin-top: 8px;">
+                    <input type="text" id="emergencyStart" list="nodeList" placeholder="Your location" style="flex: 1;" autocomplete="off">
+                    <button onclick="runEmergency()" class="emergency-btn">SHOW EXITS</button>
+                </div>
+            </div>
+
+            <!-- 5. LIVE EVACUATION SIMULATION SECTION (MULTI-AGENT SPAWN & LIVE CROWD MONITORING) -->
+            <div class="drawer-section" id="sec-simulation">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title" style="color: var(--accent-green);">🏃 Live Evacuation Simulation</div>
+                        <div class="section-subtitle">Multi-Agent Spawn & Real-Time Crowd Telemetry</div>
+                    </div>
+                </div>
+                <p style="font-size: 0.78rem; color: var(--text-muted);">A light in-browser animation: each person takes their own safest exit. For the full research simulator (queues, look-ahead planner) use the Research Lab.</p>
+                
+                <label style="font-size:0.8em; color:#94a3b8;">Occupant Spawn Mode</label>
+                <select id="simSpawnMode" onchange="onSimSpawnModeChange()">
+                    <option value="single" selected>Selected Room (Single Origin)</option>
+                    <option value="multi">Multiple Rooms</option>
+                    <option value="floor">One floor (selected floor / origin floor)</option>
+                    <option value="building" id="optAllFloors">Building-wide (all floors)</option>
+                    <option value="random">Random Valid Locations</option>
+                </select>
+
+                <div id="singleOriginSub">
+                    <label style="font-size:0.8em; color:#94a3b8; margin-top:6px; display:block;">Primary Room / Origin</label>
+                    <select id="simOrigin">
+                        <option value="">Loading origin nodes...</option>
+                    </select>
+                </div>
+
+                <label style="font-size:0.8em; color:#94a3b8; margin-top:6px; display:block;">Distribution Strategy</label>
+                <select id="simDistMode">
+                    <option value="balanced" selected>Balanced Spread</option>
+                    <option value="random">Randomized Spawn</option>
+                    <option value="crowd">Crowd-Weighted Density</option>
+                </select>
+
+                <label style="font-size:0.8em; color:#94a3b8; margin-top:6px; display:block;">Emergency Scenario</label>
+                <select id="simEmergencyType" onchange="onSimEmergencyTypeChange()">
+                    <option value="fire" selected>Active Fire Outbreak</option>
+                    <option value="crowd">Severe Crowd Congestion</option>
+                    <option value="accessibility">Wheelchair / Step-Free</option>
+                    <option value="multifloor_fire">Multi-Floor: Stairwell Blocked</option>
+                    <option value="normal">Normal — Baseline Path</option>
+                </select>
+
+                <div id="simFireSub" class="ml-subpanel visible">
+                    <label>Hazard Location</label>
+                    <select id="simHazardNode"></select>
+                    <label>Hazard Radius</label>
+                    <div class="slider-row">
+                        <input type="range" id="simHazardRadius" min="50" max="1000" step="10" value="280"
+                            oninput="document.getElementById('simHazardRadiusVal').textContent = this.value;">
+                        <span class="slider-val" id="simHazardRadiusVal">280</span>
+                    </div>
+                </div>
+
+                <label style="font-size:0.8em; color:#94a3b8; margin-top:8px; display:block;">Simulated Occupants (Population: 10 → 250)</label>
+                <div class="slider-row">
+                    <input type="range" id="simOccupantCount" min="10" max="250" step="10" value="50"
+                        oninput="document.getElementById('simOccupantCountVal').textContent = this.value;">
+                    <span class="slider-val" id="simOccupantCountVal">50</span>
+                </div>
+
+                <label style="font-size:0.8em; color:#94a3b8; margin-top:8px; display:block;">Simulation Speed</label>
+                <div class="slider-row">
+                    <input type="range" id="simSpeed" min="0.5" max="3" step="0.25" value="1.0"
+                        oninput="document.getElementById('simSpeedVal').textContent = parseFloat(this.value).toFixed(2) + 'x';">
+                    <span class="slider-val" id="simSpeedVal">1.00x</span>
+                </div>
+
+                <button class="ml-btn" style="background: linear-gradient(135deg, #10b981, #06b6d4); font-size: 0.9rem;" onclick="triggerLiveSimulation()" id="simRunBtn">⚡ START LIVE EVACUATION SIMULATION</button>
+
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button class="view-btn" style="flex:1;" onclick="toggleSimPause()" id="simPauseBtn">⏸️ Pause</button>
+                    <button class="view-btn" style="flex:1;" onclick="resetOccupantSimulation()">⟲ Reset Simulation</button>
+                </div>
+
+                <!-- Live Telemetry Card -->
+                <div id="simTelemetry" style="display:none; margin-top:10px; padding:12px; background:rgba(0,0,0,0.4); border-radius:10px; border:1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size:0.82em; font-weight:700; color:#38bdf8; margin-bottom:6px; text-transform:uppercase;">📊 Live Telemetry Summary</div>
+                    <div class="stat-card-grid">
+                        <div class="stat-tile" style="padding:8px;">
+                            <div class="stat-lbl">In Transit</div>
+                            <div class="stat-val" id="simTransitVal" style="font-size:1.1rem; color:#facc15;">0</div>
+                        </div>
+                        <div class="stat-tile" style="padding:8px;">
+                            <div class="stat-lbl">Evacuated</div>
+                            <div class="stat-val" id="simEvacuatedVal" style="font-size:1.1rem; color:#4ade80;">0 / 50</div>
+                        </div>
+                    </div>
+                    <div style="font-size:0.75em; color:#94a3b8; margin-top:6px;" id="simStatusDesc">Simulation active... Occupants progressing along route.</div>
+                </div>
+
+                <!-- LIVE CROWD MONITORING PANEL -->
+                <div id="simCrowdMonitoring" style="display:none; margin-top:10px; padding:12px; background:rgba(0,0,0,0.45); border-radius:10px; border:1px solid rgba(59, 130, 246, 0.25);">
+                    <div style="font-size:0.82em; font-weight:800; color:#4ade80; margin-bottom:8px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center;">
+                        <span>👥 LIVE CROWD MONITORING</span>
+                        <span style="font-size:0.7em; color:#94a3b8; font-weight:400;">REAL-TIME NODES</span>
+                    </div>
+                    <div id="crowdNodeList" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding-right:4px;">
+                        <!-- Dynamically populated real-time node occupancy cards -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. BUILDING SECTION -->
+            <div class="drawer-section" id="sec-building">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">🏢 Floors</div>
+                        <div class="section-subtitle">3D Layer Isolation</div>
+                    </div>
+                </div>
+                <p style="font-size: 0.78rem; color: var(--text-muted);">Toggle 3D floor filters to isolate node networks per level.</p>
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                    <div id="bldgFloorList" style="display:flex; flex-direction:column; gap:6px;"></div>
+                    <button class="view-btn" onclick="reset3DCamera()" style="margin-top: 8px;">⟲ Reset Isometric Camera</button>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- ── 3D CANVAS VIEWPORT ── -->
+        <div id="canvas-container"></div>
+
+        <!-- ── 3D FLOATING FLOOR FILTER BAR ── -->
+        <div id="floorFilterBar">
+            <span style="font-size:0.75em; font-weight:700; color:#64748b; margin-right:4px;">FLOOR:</span>
+            <span id="floorPillBar" style="display:flex; gap:6px;"></span>
+            <button class="view-btn" onclick="reset3DCamera()" title="Reset Camera View">⟲ Reset View</button>
+        </div>
+
+        <!-- ── 3D LEGEND ── -->
+        <div id="legend3d"></div>
+        <div id="toast"></div>
+        <datalist id="nodeList"></datalist>
+
+        <!-- ── 3D HOVER TOOLTIP ── -->
+        <div id="nodeTooltip"></div>
+
+        <!-- ── 2D FLOOR-BY-FLOOR EVACUATION TRAY (PRESERVED & MAXIMIZABLE) ── -->
+        <div id="evac2dTray">
+            <div class="tray-header">
+                <div class="tray-title">
+                    <span>🗺️</span>
+                    <span id="trayFloorCountTitle">2D Floor-by-Floor Evacuation Guidance</span>
+                </div>
+                <div class="tray-actions">
+                    <button class="tray-btn" onclick="toggle2DTrayMax()" id="trayMaxBtn">🗖 Maximize</button>
+                    <button class="tray-btn" onclick="toggle2DTray()" id="trayToggleBtn">▲ Minimize</button>
+                    <button class="tray-btn" onclick="close2DTray()">✖ Close</button>
+                </div>
+            </div>
+
+            <div class="floor-strip" id="floorCardsStrip">
+                <!-- Dynamically populated per-floor cards with canvas -->
+            </div>
+
+            <div class="legend-row">
+                <span style="font-weight:700; color:#94a3b8;">Legend:</span>
+                <div class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span> You Are Here (Start)</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span> ML Safe Path</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Stairs / Lift Transfer</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Final Exit</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> Fire Danger Zone</div>
             </div>
         </div>
 
-        <!-- ── 5. ACCESSIBILITY toggle (always visible) ──────── -->
-        <div class="toggle-row" style="margin-top:10px;">
-            <label for="mlMobility">&#x267F; Mobility Impaired (step-free route)</label>
-            <input type="checkbox" id="mlMobility">
-        </div>
-
-        <button class="ml-btn" onclick="runMLEvacuation()" id="mlBtn">&#x26A1; Simulate ML Evacuation</button>
-        <div id="mlSpinner">&#x23F3; Calculating ML route…</div>
-        <div id="mlStatus"></div>
-
-        <div id="mlMetrics">
-            <!-- Result rows -->
-            <div class="metric-row"><span class="label">Recommended Exit</span><span id="mExit">—</span></div>
-            <div class="metric-row"><span class="label">Physical Dist</span><span id="mDist">—</span></div>
-            <div class="metric-row"><span class="label">ML Cost</span><span id="mCost">—</span></div>
-            <div class="metric-row"><span class="label">Peak Hazard</span><span id="mHazard">—</span></div>
-            <div class="metric-row"><span class="label">Avg Crowd</span><span id="mCrowd">—</span></div>
-            <div class="metric-row"><span class="label">Path Changed</span><span id="mChanged">—</span></div>
-            <!-- Echo: what the backend actually used -->
-            <div class="metric-row echo"><span class="label">↳ Origin used</span><span id="mOriginUsed" style="color:#a5f3fc;">—</span></div>
-            <div class="metric-row"><span class="label">↳ Hazard node</span><span id="mHazardUsed" style="color:#fca5a5;">—</span></div>
-            <div class="metric-row"><span class="label">↳ Crowd node</span><span id="mCrowdUsed" style="color:#fde68a;">—</span></div>
-            <div class="metric-row"><span class="label">↳ Mobility impaired</span><span id="mMobilityUsed">—</span></div>
-            <div class="route-seq" id="mRoute"></div>
-        </div>
-
-        <hr style="margin: 15px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.08);">
-        <h4 style="margin: 0 0 10px 0;">&#x1F6A8; Static Emergency Routing</h4>
-        <div style="display: flex; gap: 5px;">
-            <input type="text" id="emergencyStart" placeholder="Your Location" style="flex: 1;">
-            <button onclick="runEmergency()" class="emergency-btn">SHOW EXITS</button>
-        </div>
-
-        <p id="pathInfo" style="font-size: 0.9em; margin-top: 15px; word-wrap: break-word;"></p>
     </div>
-    
-    <div id="canvas-container"></div>
 
-    <!-- ── 3D FLOATING FLOOR FILTER BAR ── -->
-    <div id="floorFilterBar">
-        <span style="font-size:0.75em; font-weight:700; color:#64748b; margin-right:4px;">FLOOR:</span>
-        <button class="floor-pill active" data-floor="all" onclick="setFloorFilter('all')">🏢 All 7 Floors</button>
-        <button class="floor-pill" data-floor="6" onclick="setFloorFilter(6)">F6</button>
-        <button class="floor-pill" data-floor="5" onclick="setFloorFilter(5)">F5</button>
-        <button class="floor-pill" data-floor="4" onclick="setFloorFilter(4)">F4</button>
-        <button class="floor-pill" data-floor="3" onclick="setFloorFilter(3)">F3</button>
-        <button class="floor-pill" data-floor="2" onclick="setFloorFilter(2)">F2</button>
-        <button class="floor-pill" data-floor="1" onclick="setFloorFilter(1)">F1</button>
-        <button class="floor-pill" data-floor="0" onclick="setFloorFilter(0)">Ground</button>
-        <button class="view-btn" onclick="reset3DCamera()" title="Reset Camera View">⟲ Reset View</button>
-    </div>
-
-    <!-- ── 3D HOVER TOOLTIP ── -->
-    <div id="nodeTooltip"></div>
-
-    <!-- ── 2D FLOOR-BY-FLOOR EVACUATION TRAY ── -->
-    <div id="evac2dTray">
-        <div class="tray-header">
-            <div class="tray-title">
-                <span>🗺️</span>
-                <span id="trayFloorCountTitle">2D Floor-by-Floor Evacuation Route</span>
-            </div>
-            <div class="tray-actions">
-                <button class="tray-btn" onclick="toggle2DTray()" id="trayToggleBtn">▲ Minimize</button>
-                <button class="tray-btn" onclick="close2DTray()">✖ Close</button>
-            </div>
-        </div>
-
-        <div class="floor-strip" id="floorCardsStrip">
-            <!-- Dynamically populated per-floor cards with canvas -->
-        </div>
-
-        <div class="legend-row">
-            <span style="font-weight:700; color:#94a3b8;">Legend:</span>
-            <div class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span> You Are Here (Start)</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span> ML Safe Path</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Stairs / Lift Transfer</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Final Exit</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> Fire Danger Zone</div>
-        </div>
-    </div>
-
+    <!-- ── COMPLETE JAVASCRIPT ENGINE ── -->
     <script>
-        // --- 1. UI TOGGLE ---
-        function toggleUI() {
-            const uiPanel = document.getElementById('ui');
-            const showBtn = document.getElementById('showMenuBtn');
-            
-            if (uiPanel.classList.contains('hidden')) {
-                uiPanel.classList.remove('hidden');
-                showBtn.style.display = 'none';
-            } else {
-                uiPanel.classList.add('hidden');
-                showBtn.style.display = 'block';
+        // ── BUILDING CONTEXT (campus_data.js or hospital_data.js, same shape) ──
+        const IS_HOSPITAL = window.BUILDING === 'hospital';
+        const BUILDING_TITLE = campusData.title || 'Campus Block (G+6)';
+        const EXITS = campusData.exits || ['east entrance/exit', 'north entrance/exit', 'east main entrance', 'north main entrance'];
+        const FLOORS = [...new Set(Object.values(campusData.nodes).map(n => Math.round(n.z / 350)))].sort((a, b) => a - b);
+        const MAX_FLOOR = Math.max(...FLOORS);
+        const DEFAULTS = IS_HOSPITAL
+            ? { origin: 'g_waiting room', hazard: 'f2_j6', crowd: 'g_j2' }
+            : { origin: 'classroom g17', hazard: 'j6', crowd: 'j2' };
+
+        function switchBuilding(b) {
+            if (b === window.BUILDING) return;
+            location.search = (b === 'hospital') ? '?building=hospital' : '';
+        }
+
+        function addLog(msg, color) {
+            const box = document.getElementById('overviewLogBox');
+            if (!box) return;
+            const t = new Date().toLocaleTimeString();
+            const row = document.createElement('div');
+            row.innerHTML = `<span style="color:${color || 'var(--accent-cyan)'};">[${t}]</span> ${msg}`;
+            box.prepend(row);
+            while (box.children.length > 30) box.lastChild.remove();
+        }
+
+        let toastTimer = null;
+        function showToast(msg) {
+            const el = document.getElementById('toast');
+            if (!el) return;
+            el.innerHTML = msg;
+            el.style.display = 'block';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2200);
+        }
+
+        // ── SECTION TAB SWITCHING ──
+        function switchSection(sectionId) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.drawer-section').forEach(sec => sec.classList.remove('active'));
+
+            const tab = document.getElementById('tab-' + sectionId);
+            const sec = document.getElementById('sec-' + sectionId);
+
+            if (tab) tab.classList.add('active');
+            if (sec) sec.classList.add('active');
+
+            const drawer = document.getElementById('panelDrawer');
+            if (drawer) drawer.classList.remove('collapsed');
+
+            if (sectionId === 'building') {
+                setFloorFilter(currentFloorFilter);
             }
+        }
+
+        // Live Header Clock
+        setInterval(() => {
+            const clockEl = document.getElementById('headerClock');
+            if (clockEl) {
+                clockEl.innerText = new Date().toLocaleTimeString();
+            }
+        }, 1000);
+
+        // Dynamic Occupant State & Crowd Monitoring Dictionary
+        let simulatedOccupants = [];
+        let isSimPaused = false;
+        let simOccupantsEvacuated = 0;
+        let simTotalOccupants = 50;
+        let currentMLRouteData = null;
+
+        // Monitored Key Locations & Capacities
+        const MONITORED_NODES = IS_HOSPITAL ? hospitalMonitoredNodes() : {
+            'north entrance/exit': { name: 'Ground North Exit', category: 'EXITS', capacity: 35 },
+            'east entrance/exit':  { name: 'Ground East Exit',  category: 'EXITS', capacity: 35 },
+            'north main entrance': { name: 'North Main Entrance', category: 'EXITS', capacity: 45 },
+            'east main entrance':  { name: 'East Main Entrance',  category: 'EXITS', capacity: 45 },
+            
+            'stairs 1':    { name: 'Ground Staircase 1', category: 'STAIRCASES', capacity: 20 },
+            'stairs 2':    { name: 'Ground Staircase 2', category: 'STAIRCASES', capacity: 20 },
+            'f1_stairs 1': { name: 'Floor 1 Staircase 1', category: 'STAIRCASES', capacity: 20 },
+            
+            'lift':   { name: 'Ground Elevator 1', category: 'LIFTS', capacity: 15 },
+            'lift 2': { name: 'Ground Elevator 2', category: 'LIFTS', capacity: 15 },
+            'lift 3': { name: 'North Elevator Tower', category: 'LIFTS', capacity: 15 },
+            
+            'j1':  { name: 'Main Entrance Foyer (j1)', category: 'JUNCTIONS', capacity: 35 },
+            'j2':  { name: 'Lobby Concourse (j2)',    category: 'JUNCTIONS', capacity: 35 },
+            'j5':  { name: 'East Corridor Hub (j5)',   category: 'JUNCTIONS', capacity: 25 },
+            'j6':  { name: 'East Exit Junction (j6)',  category: 'JUNCTIONS', capacity: 30 },
+            'j7':  { name: 'South Atrium Hub (j7)',    category: 'JUNCTIONS', capacity: 25 },
+            'j10': { name: 'West Corridor Hub (j10)',  category: 'JUNCTIONS', capacity: 25 },
+            'j18': { name: 'North Wing Junction (j18)', category: 'JUNCTIONS', capacity: 25 },
+        };
+
+        function hospitalMonitoredNodes() {
+            const out = {};
+            const pretty = id => id.replace(/^g_/, 'Ground ').replace(/^f(\d)_/, 'Floor $1 ');
+            EXITS.forEach(id => { out[id] = { name: pretty(id), category: 'EXITS', capacity: 35 }; });
+            Object.keys(campusData.nodes).forEach(id => {
+                const lo = id.toLowerCase();
+                if (EXITS.includes(id)) return;
+                if (lo.includes('stair')) out[id] = { name: pretty(id), category: 'STAIRCASES', capacity: 20 };
+                else if (lo.includes('ramp')) out[id] = { name: pretty(id), category: 'RAMP', capacity: 20 };
+            });
+            return out;
+        }
+
+        function onSimSpawnModeChange() {
+            const mode = document.getElementById('simSpawnMode').value;
+            const singleSub = document.getElementById('singleOriginSub');
+            if (singleSub) {
+                singleSub.style.display = (mode === 'single') ? 'block' : 'none';
+            }
+        }
+
+        function resetOccupantSimulation() {
+            simulatedOccupants.forEach(occ => {
+                if (occ.mesh) {
+                    scene.remove(occ.mesh);
+                    if (occ.mesh.geometry) occ.mesh.geometry.dispose();
+                    if (occ.mesh.material) occ.mesh.material.dispose();
+                }
+            });
+            simulatedOccupants = [];
+            isSimPaused = false;
+            simOccupantsEvacuated = 0;
+            const pauseBtn = document.getElementById('simPauseBtn');
+            if (pauseBtn) pauseBtn.textContent = '⏸️ Pause';
+            const telem = document.getElementById('simTelemetry');
+            if (telem) telem.style.display = 'none';
+            const crowdMon = document.getElementById('simCrowdMonitoring');
+            if (crowdMon) crowdMon.style.display = 'none';
+            clearMLVisuals();
+            close2DTray();
+        }
+
+        function toggleSimPause() {
+            isSimPaused = !isSimPaused;
+            const pauseBtn = document.getElementById('simPauseBtn');
+            if (pauseBtn) {
+                pauseBtn.textContent = isSimPaused ? '▶️ Resume' : '⏸️ Pause';
+            }
+        }
+
+        function getValidRoomNodes() {
+            const rooms = Object.keys(campusData.nodes).filter(id => getNodeCategory3D(id) === 'room');
+            return rooms.length > 0 ? rooms : [DEFAULTS.origin];
+        }
+
+        function getValidRoomsByFloor() {
+            const floorGroups = {};
+            for (const [id, node] of Object.entries(campusData.nodes)) {
+                if (getNodeCategory3D(id) === 'room') {
+                    const fl = getNodeFloor3D(node.z);
+                    if (!floorGroups[fl]) floorGroups[fl] = [];
+                    floorGroups[fl].push(id);
+                }
+            }
+            return floorGroups;
+        }
+
+        // --- DYNAMIC PER-OCCUPANT MULTI-EXIT DIJKSTRA EVALUATOR ---
+        function findOptimalExitForOccupant(startRoom, hazardNode, hazardRadius) {
+            const candidateExits = EXITS;
+            const nodes = campusData.nodes;
+            const edges = campusData.edges;
+
+            if (!nodes[startRoom]) {
+                startRoom = DEFAULTS.origin;
+            }
+
+            const hNode = (hazardNode && nodes[hazardNode]) ? nodes[hazardNode] : null;
+            const hRadiusRaw = hazardRadius || 280; // raw graph units
+
+            let bestRoute = null;
+            let bestExit = null;
+            let minCost = Infinity;
+
+            candidateExits.forEach(exitId => {
+                if (!nodes[exitId]) return;
+
+                const graph = {};
+                for (const id in nodes) graph[id] = {};
+
+                edges.forEach(([u, v]) => {
+                    if (!nodes[u] || !nodes[v]) return;
+
+                    const dx = nodes[u].x - nodes[v].x;
+                    const dy = nodes[u].y - nodes[v].y;
+                    const dz = nodes[u].z - nodes[v].z;
+                    const baseDist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                    let hazardPenalty = 1.0;
+                    if (hNode) {
+                        const du = Math.sqrt(Math.pow(nodes[u].x - hNode.x, 2) + Math.pow(nodes[u].y - hNode.y, 2) + Math.pow(nodes[u].z - hNode.z, 2));
+                        const dv = Math.sqrt(Math.pow(nodes[v].x - hNode.x, 2) + Math.pow(nodes[v].y - hNode.y, 2) + Math.pow(nodes[v].z - hNode.z, 2));
+                        if (du < hRadiusRaw || dv < hRadiusRaw) {
+                            hazardPenalty = 12.0; // severe cost multiplier to steer occupants away from fire
+                        }
+                    }
+
+                    const weight = baseDist * hazardPenalty;
+                    graph[u][v] = weight;
+                    graph[v][u] = weight;
+                });
+
+                const distances = {};
+                const prev = {};
+                const unvisited = new Set(Object.keys(nodes));
+
+                for (const id in nodes) {
+                    distances[id] = Infinity;
+                    prev[id] = null;
+                }
+                distances[startRoom] = 0;
+
+                while (unvisited.size > 0) {
+                    let curr = null;
+                    let smallestDist = Infinity;
+                    for (const id of unvisited) {
+                        if (distances[id] < smallestDist) {
+                            smallestDist = distances[id];
+                            curr = id;
+                        }
+                    }
+
+                    if (!curr || smallestDist === Infinity) break;
+                    if (curr === exitId) break;
+
+                    unvisited.delete(curr);
+
+                    for (const neighbor in graph[curr]) {
+                        if (!unvisited.has(neighbor)) continue;
+                        const alt = distances[curr] + graph[curr][neighbor];
+                        if (alt < distances[neighbor]) {
+                            distances[neighbor] = alt;
+                            prev[neighbor] = curr;
+                        }
+                    }
+                }
+
+                if (distances[exitId] < minCost) {
+                    minCost = distances[exitId];
+                    bestExit = exitId;
+
+                    let path = [];
+                    let u = exitId;
+                    while (u !== null) {
+                        path.unshift(u);
+                        u = prev[u];
+                    }
+                    bestRoute = path;
+                }
+            });
+
+            return {
+                path: (bestRoute && bestRoute.length >= 2) ? bestRoute : findPath(startRoom, candidateExits[0]),
+                exit: bestExit || candidateExits[0],
+                cost: minCost
+            };
+        }
+
+        function spawnMultiOccupants(primaryRoute, count, spawnMode, distMode) {
+            simulatedOccupants.forEach(occ => {
+                if (occ.mesh) scene.remove(occ.mesh);
+            });
+            simulatedOccupants = [];
+            simOccupantsEvacuated = 0;
+            simTotalOccupants = count;
+
+            // Clear static 3D tube lines when launching Live Simulation
+            clearMLVisuals();
+
+            const allValidRooms = getValidRoomNodes();
+            const floorGroups = getValidRoomsByFloor();
+            const activeFloors = Object.keys(floorGroups).map(Number).sort((a, b) => a - b);
+
+            const simHazNode = document.getElementById('simHazardNode') ? document.getElementById('simHazardNode').value : null;
+            const simHazRad  = document.getElementById('simHazardRadius') ? parseFloat(document.getElementById('simHazardRadius').value) : 280;
+
+            const bodyGeo = new THREE.SphereGeometry(0.32, 16, 16);
+            const colors = [0x00f0ff, 0x38bdf8, 0x10b981, 0xfacc15, 0xf97316, 0xa855f7];
+
+            const exitCounts = {};
+            const simOriginNode = campusData.nodes[document.getElementById('simOrigin').value];
+            const simFloor = (currentFloorFilter !== 'all') ? parseInt(currentFloorFilter)
+                           : (simOriginNode ? getNodeFloor3D(simOriginNode.z) : FLOORS[0]);
+
+            for (let i = 0; i < count; i++) {
+                let startRoom;
+                if (spawnMode === 'single') {
+                    startRoom = document.getElementById('simOrigin').value || DEFAULTS.origin;
+                } else if (spawnMode === 'floor') {
+                    const flFiltered = floorGroups[simFloor] || allValidRooms;
+                    startRoom = flFiltered[i % flFiltered.length];
+                } else if (spawnMode === 'building') {
+                    const targetFloor = activeFloors[i % activeFloors.length];
+                    const floorRooms = floorGroups[targetFloor] || allValidRooms;
+                    const roomIdx = Math.floor(i / activeFloors.length) % floorRooms.length;
+                    startRoom = floorRooms[roomIdx];
+                } else {
+                    startRoom = allValidRooms[Math.floor(Math.random() * allValidRooms.length)];
+                }
+
+                let routePath;
+                let targetExit;
+                let routeCost = 0;
+
+                if (spawnMode === 'single' && primaryRoute && primaryRoute.length >= 2) {
+                    routePath = primaryRoute;
+                    targetExit = primaryRoute[primaryRoute.length - 1];
+                } else {
+                    // INDIVIDUAL PER-OCCUPANT DIJKSTRA ALL-EXIT EVALUATION
+                    const evalRes = findOptimalExitForOccupant(startRoom, simHazNode, simHazRad);
+                    routePath = evalRes.path;
+                    targetExit = evalRes.exit;
+                    routeCost = evalRes.cost;
+                }
+
+                if (!routePath || routePath.length < 2) continue;
+
+                exitCounts[targetExit] = (exitCounts[targetExit] || 0) + 1;
+
+                // DEBUG CONSOLE OUTPUT FOR VERIFICATION
+                console.log(`Occupant #${i + 1}: Origin = [${startRoom}], Target Exit = [${targetExit}], Cost = ${routeCost.toFixed(1)}, Path Length = ${routePath.length}`);
+
+                const points = routePath.map(id => {
+                    const n = campusData.nodes[id];
+                    return n ? new THREE.Vector3(n.x / 100, n.z / 100, n.y / 100) : null;
+                }).filter(p => p !== null);
+
+                if (points.length < 2) continue;
+
+                const col = colors[i % colors.length];
+                const mat = new THREE.MeshStandardMaterial({
+                    color: col,
+                    emissive: col,
+                    emissiveIntensity: 0.6,
+                    roughness: 0.3
+                });
+
+                const mesh = new THREE.Mesh(bodyGeo, mat);
+                mesh.position.copy(points[0]);
+                mesh.position.y += 0.45;
+                scene.add(mesh);
+
+                const dir = points[1].clone().sub(points[0]).normalize();
+                const perp = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+                const offsetDist = (Math.random() - 0.5) * 0.45;
+                const lateralVector = perp.clone().multiplyScalar(offsetDist);
+
+                simulatedOccupants.push({
+                    id: i + 1,
+                    mesh: mesh,
+                    startRoom: startRoom,
+                    targetExit: targetExit,
+                    routePath: routePath,
+                    points: points,
+                    segmentIndex: 0,
+                    progress: 0,
+                    speed: 0.007 + Math.random() * 0.006,
+                    delay: Math.floor(i * 3 + Math.random() * 6),
+                    lateralVector: lateralVector,
+                    state: 'waiting'
+                });
+            }
+
+            const telem = document.getElementById('simTelemetry');
+            if (telem) telem.style.display = 'block';
+            document.getElementById('simTransitVal').textContent = count;
+            document.getElementById('simEvacuatedVal').textContent = `0 / ${count}`;
+            
+            const exitSummary = Object.entries(exitCounts).map(([ex, c]) => `${ex}: ${c}`).join(' | ');
+            document.getElementById('simStatusDesc').textContent = `Live simulation active (${count} occupants). Exit Distribution -> ${exitSummary}`;
+
+            const crowdMon = document.getElementById('simCrowdMonitoring');
+            if (crowdMon) crowdMon.style.display = 'block';
+            if (hazardZoneMesh) { scene.remove(hazardZoneMesh); hazardZoneMesh = null; }
+            const simType = document.getElementById('simEmergencyType').value;
+            if ((simType === 'fire' || simType === 'multifloor_fire') && simHazNode) drawHazardZone(simHazNode, simHazRad);
+            addLog(`Live simulation: ${simulatedOccupants.length} people, ${Object.keys(exitCounts).length} exits used`, 'var(--accent-green)');
+        }
+
+        // Live Simulation Form Handler (Completely Isolated from Static ML)
+        function onSimEmergencyTypeChange() {
+            const type = document.getElementById('simEmergencyType').value;
+            const simSub = document.getElementById('simFireSub');
+            if (simSub) {
+                simSub.classList.toggle('visible', type === 'fire' || type === 'multifloor_fire');
+            }
+        }
+
+        function triggerLiveSimulation() {
+            const spawnMode   = document.getElementById('simSpawnMode').value;
+            const distMode    = document.getElementById('simDistMode').value;
+            const count       = parseInt(document.getElementById('simOccupantCount').value) || 50;
+
+            // DIRECTLY LAUNCH LIVE SIMULATION WITH INDIVIDUAL OCCUPANT ROUTING
+            spawnMultiOccupants(null, count, spawnMode, distMode);
         }
 
         // --- 2. 3D SCENE SETUP & ATMOSPHERE ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#0b101e'); 
-        scene.fog = new THREE.FogExp2('#0b101e', 0.002); // Soft atmospheric depth without obscuring higher floors
+        scene.background = new THREE.Color('#080c16'); 
+        scene.fog = new THREE.FogExp2('#080c16', 0.002);
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+        const canvasContainer = document.getElementById('canvas-container');
+        const camera = new THREE.PerspectiveCamera(45, (canvasContainer.clientWidth || (window.innerWidth - 436)) / (canvasContainer.clientHeight || window.innerHeight), 1, 10000);
         const scale = 100;
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(canvasContainer.clientWidth || (window.innerWidth - 436), canvasContainer.clientHeight || window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.1;
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        canvasContainer.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; 
@@ -572,7 +1676,7 @@
             6: 0xfb7185, // Floor 6: Rose
         };
 
-        const FLOOR_NAMES_3D = {
+        const FLOOR_NAMES_3D = campusData.floorNames ? Object.assign({}, campusData.floorNames) : {
             0: 'Ground Floor',
             1: 'Floor 1',
             2: 'Floor 2',
@@ -584,9 +1688,11 @@
 
         function getNodeCategory3D(name) {
             const lower = name.toLowerCase();
-            if (lower.includes('exit') || lower.includes('entrance')) return 'exit';
+            if (EXITS.includes(name)) return 'exit';
+            if (!IS_HOSPITAL && (lower.includes('exit') || lower.includes('entrance'))) return 'exit';
             if (lower.includes('stair')) return 'stairs';
             if (lower.includes('lift')) return 'lift';
+            if (lower.includes('ramp')) return 'ramp';
             if (name.startsWith('j') || name.includes('_j')) return 'junction';
             return 'room';
         }
@@ -612,7 +1718,7 @@
 
         // Floor bounding boxes for floor slab creation
         const floorBounds = {};
-        for (let fl = 0; fl <= 6; fl++) {
+        for (const fl of FLOORS) {
             floorBounds[fl] = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity, count: 0 };
         }
 
@@ -640,22 +1746,42 @@
 
         const bldgCenterX = sumX / nodeCount;
         const bldgCenterZ = sumY / nodeCount;
-        const bldgCenterY = 10.5; // (21.0 max height / 2)
+        const bldgCenterY = MAX_FLOOR * 3.5 / 2;
 
-        // Set default camera isometric perspective framing all 7 floors
-        camera.position.set(bldgCenterX + 32, 28, bldgCenterZ + 42);
+        // Camera distance scales with the building's footprint (campus keeps its original framing)
+        let gMinX = Infinity, gMaxX = -Infinity, gMinZ = Infinity, gMaxZ = -Infinity;
+        Object.values(floorBounds).forEach(b => {
+            if (!b.count) return;
+            gMinX = Math.min(gMinX, b.minX); gMaxX = Math.max(gMaxX, b.maxX);
+            gMinZ = Math.min(gMinZ, b.minZ); gMaxZ = Math.max(gMaxZ, b.maxZ);
+        });
+        const VIEW_SPAN = Math.max(gMaxX - gMinX, gMaxZ - gMinZ, MAX_FLOOR * 3.5, 8);
+        function homeView() {
+            return [bldgCenterX + 1.31 * VIEW_SPAN, bldgCenterY + 0.72 * VIEW_SPAN, bldgCenterZ + 1.72 * VIEW_SPAN,
+                    bldgCenterX, bldgCenterY, bldgCenterZ];
+        }
+        function floorView(fl) {
+            const flY = fl * 3.5;
+            return [bldgCenterX + 0.9 * VIEW_SPAN, flY + 0.65 * VIEW_SPAN, bldgCenterZ + 1.15 * VIEW_SPAN,
+                    bldgCenterX, flY, bldgCenterZ];
+        }
+
+        // Set default camera perspective
+        { const v = homeView(); camera.position.set(v[0], v[1], v[2]); }
         controls.target.set(bldgCenterX, bldgCenterY, bldgCenterZ);
         controls.update();
 
         // --- 5. RENDER FLOOR SLABS & FLOATING LEVEL BADGES ---
         function createFloorTextSprite(text, colorHex) {
             const canvas = document.createElement('canvas');
-            canvas.width = 256;
+            const probe = canvas.getContext('2d');
+            probe.font = 'bold 22px Inter, sans-serif';
+            canvas.width = Math.max(256, Math.ceil(probe.measureText(text).width) + 48);
             canvas.height = 64;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = 'rgba(12, 16, 27, 0.85)';
             ctx.beginPath();
-            ctx.roundRect(8, 8, 240, 48, 10);
+            ctx.roundRect(8, 8, canvas.width - 16, 48, 10);
             ctx.fill();
             ctx.strokeStyle = colorHex;
             ctx.lineWidth = 3;
@@ -664,18 +1790,20 @@
             ctx.font = 'bold 22px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(text, 128, 32);
+            ctx.fillText(text, canvas.width / 2, 32);
 
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.85 });
             const sprite = new THREE.Sprite(spriteMat);
-            sprite.scale.set(6, 1.5, 1);
+            const k = Math.min(1, Math.max(0.6, VIEW_SPAN / 24.5));
+            sprite.scale.set(6 * k * canvas.width / 256, 1.5 * k, 1);
+            sprite.userData.halfWidth = 3 * k * canvas.width / 256;
             return sprite;
         }
 
-        for (let fl = 0; fl <= 6; fl++) {
+        for (const fl of FLOORS) {
             const b = floorBounds[fl];
-            if (b.count === 0) continue;
+            if (!b || b.count === 0) continue;
 
             const flY = fl * 3.5;
             const flColor = FLOOR_COLORS_3D[fl];
@@ -687,7 +1815,6 @@
             const slabGroup = new THREE.Group();
             slabGroup.userData = { floor: fl };
 
-            // Translucent floor plane
             const slabGeo = new THREE.PlaneGeometry(width, depth);
             const slabMat = new THREE.MeshBasicMaterial({
                 color: flColor,
@@ -702,7 +1829,6 @@
             slabGroup.add(slabMesh);
             floorSlabMeshes[fl] = slabMat;
 
-            // Thin perimeter outline
             const edgesGeo = new THREE.EdgesGeometry(slabGeo);
             const edgesMat = new THREE.LineBasicMaterial({ color: flColor, transparent: true, opacity: 0.25 });
             const outline = new THREE.LineSegments(edgesGeo, edgesMat);
@@ -710,16 +1836,15 @@
             outline.position.set(midX, flY - 0.05, midZ);
             slabGroup.add(outline);
 
-            // Floating 3D floor badge
-            const badgeSprite = createFloorTextSprite(`L${fl} • ${FLOOR_NAMES_3D[fl].toUpperCase()}`, `#${flColor.toString(16).padStart(6,'0')}`);
-            badgeSprite.position.set(b.minX - 4, flY + 0.5, midZ);
+            const badgeSprite = createFloorTextSprite(`L${fl} • ${(FLOOR_NAMES_3D[fl] || ('Floor ' + fl)).toUpperCase()}`, `#${flColor.toString(16).padStart(6,'0')}`);
+            badgeSprite.position.set(gMinX - 3 - badgeSprite.userData.halfWidth, flY + 0.5, midZ);
             slabGroup.add(badgeSprite);
 
             scene.add(slabGroup);
             floorSlabGroups.push(slabGroup);
         }
 
-        // --- 6. RENDER ALL 452 NODES WITH HIERARCHICAL STYLING ---
+        // --- 6. RENDER ALL 452 NODES ---
         for (const [name, pos] of Object.entries(campusData.nodes)) {
             const fl = getNodeFloor3D(pos.z);
             const cat = getNodeCategory3D(name);
@@ -727,7 +1852,6 @@
 
             let nodeMesh;
             if (cat === 'exit') {
-                // Exit: Emerald double-ring cylinder
                 const mat = new THREE.MeshStandardMaterial({
                     color: 0x10b981,
                     emissive: 0x059669,
@@ -737,7 +1861,6 @@
                 });
                 nodeMesh = new THREE.Mesh(exitGeo, mat);
             } else if (cat === 'stairs') {
-                // Stairs: Golden vertical capsule
                 const mat = new THREE.MeshStandardMaterial({
                     color: 0xf59e0b,
                     emissive: 0xd97706,
@@ -746,7 +1869,6 @@
                 });
                 nodeMesh = new THREE.Mesh(stairCylGeo, mat);
             } else if (cat === 'lift') {
-                // Lift: Cyan vertical capsule
                 const mat = new THREE.MeshStandardMaterial({
                     color: 0x06b6d4,
                     emissive: 0x0891b2,
@@ -754,8 +1876,15 @@
                     roughness: 0.3
                 });
                 nodeMesh = new THREE.Mesh(liftCylGeo, mat);
+            } else if (cat === 'ramp') {
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0xa855f7,
+                    emissive: 0x7e22ce,
+                    emissiveIntensity: 0.6,
+                    roughness: 0.3
+                });
+                nodeMesh = new THREE.Mesh(stairCylGeo, mat);
             } else if (cat === 'junction') {
-                // Junction: Subtle waypoint
                 const mat = new THREE.MeshStandardMaterial({
                     color: 0x94a3b8,
                     roughness: 0.6,
@@ -763,7 +1892,6 @@
                 });
                 nodeMesh = new THREE.Mesh(juncSphereGeo, mat);
             } else {
-                // Room: Floor-tinted sphere
                 const mat = new THREE.MeshStandardMaterial({
                     color: flColor,
                     roughness: 0.35,
@@ -800,10 +1928,10 @@
             const p2 = new THREE.Vector3(end.x / scale, end.z / scale, end.y / scale);
 
             if (isBridge) {
-                // Vertical Stair / Lift Shaft Column
                 const isStair = edge[0].toLowerCase().includes('stair') || edge[1].toLowerCase().includes('stair');
-                const bridgeColor = isStair ? 0xf59e0b : 0x06b6d4;
-                const emissiveCol = isStair ? 0xb45309 : 0x0e7490;
+                const isRamp = !isStair && (edge[0].toLowerCase().includes('ramp') || edge[1].toLowerCase().includes('ramp'));
+                const bridgeColor = isStair ? 0xf59e0b : (isRamp ? 0xa855f7 : 0x06b6d4);
+                const emissiveCol = isStair ? 0xb45309 : (isRamp ? 0x7e22ce : 0x0e7490);
 
                 const curve = new THREE.LineCurve3(p1, p2);
                 const tubeGeo = new THREE.TubeGeometry(curve, 8, 0.1, 8, false);
@@ -818,12 +1946,11 @@
                 tubeMesh.userData = {
                     fromFloor: getNodeFloor3D(start.z),
                     toFloor: getNodeFloor3D(end.z),
-                    type: isStair ? 'stair_bridge' : 'lift_bridge'
+                    type: isStair ? 'stair_bridge' : (isRamp ? 'ramp_bridge' : 'lift_bridge')
                 };
                 scene.add(tubeMesh);
                 verticalBridgeMeshes.push(tubeMesh);
             } else {
-                // Intra-floor corridor connection
                 const geom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
                 const lineMat = edgeBaseMat.clone();
                 const line = new THREE.Line(geom, lineMat);
@@ -833,13 +1960,12 @@
             }
         });
 
-        // --- 8. INTERACTIVE FLOOR FILTERING (MODE 1 & MODE 2) ---
+        // --- 8. INTERACTIVE FLOOR FILTERING ---
         let currentFloorFilter = 'all';
 
         function setFloorFilter(filter) {
             currentFloorFilter = filter;
 
-            // Update UI buttons
             document.querySelectorAll('.floor-pill').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.floor === String(filter));
             });
@@ -847,7 +1973,6 @@
             const isAll = (filter === 'all');
             const targetFl = isAll ? null : parseInt(filter);
 
-            // Filter Node Meshes
             for (const [name, mesh] of Object.entries(allNodeMeshes)) {
                 const nodeFl = mesh.userData.floor;
                 if (isAll || nodeFl === targetFl) {
@@ -855,14 +1980,12 @@
                     mesh.material.transparent = false;
                     mesh.material.opacity = 1.0;
                 } else {
-                    // Mode 2: Faded ghost representation for out-of-focus floors
                     mesh.visible = true;
                     mesh.material.transparent = true;
                     mesh.material.opacity = 0.08;
                 }
             }
 
-            // Filter Intra-floor Edges
             intraEdgeLines.forEach(item => {
                 if (isAll || item.userData.floor === targetFl) {
                     item.line.material.opacity = isAll ? 0.35 : 0.65;
@@ -871,7 +1994,6 @@
                 }
             });
 
-            // Filter Vertical Connections
             verticalBridgeMeshes.forEach(bridge => {
                 if (isAll) {
                     bridge.material.opacity = 0.85;
@@ -881,7 +2003,6 @@
                 }
             });
 
-            // Filter Floor Slab visuals
             floorSlabGroups.forEach(grp => {
                 const fl = grp.userData.floor;
                 if (isAll || fl === targetFl) {
@@ -894,12 +2015,10 @@
                 }
             });
 
-            // Smooth Camera Focus
             if (isAll) {
-                animate3DCamera(bldgCenterX + 32, 28, bldgCenterZ + 42, bldgCenterX, bldgCenterY, bldgCenterZ);
+                animate3DCamera(...homeView());
             } else {
-                const flY = targetFl * 3.5;
-                animate3DCamera(bldgCenterX + 22, flY + 16, bldgCenterZ + 28, bldgCenterX, flY, bldgCenterZ);
+                animate3DCamera(...floorView(targetFl));
             }
         }
 
@@ -930,19 +2049,67 @@
         const mouse = new THREE.Vector2();
         const tooltipEl = document.getElementById('nodeTooltip');
 
-        window.addEventListener('mousemove', (event) => {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
+        function pickNodeAt(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            const hits = raycaster.intersectObjects(nodeInteractiveList);
+            return raycaster.intersectObjects(nodeInteractiveList.filter(m => m.material.opacity > 0.5));
+        }
+
+        let downAt = null;
+        renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+        renderer.domElement.addEventListener('pointerup', e => {
+            if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+            const hits = pickNodeAt(e);
+            if (hits && hits.length > 0 && hits[0].object.userData.id) onNodePicked(hits[0].object.userData.id);
+        });
+
+        function setSelectValue(selId, value) {
+            const sel = document.getElementById(selId);
+            if (!sel) return false;
+            if (![...sel.options].some(o => o.value === value)) return false;
+            sel.value = value;
+            return true;
+        }
+
+        function onNodePicked(id) {
+            const active = document.querySelector('.drawer-section.active');
+            const sec = active ? active.id.replace('sec-', '') : '';
+            if (sec === 'navigation') {
+                const a = document.getElementById('startInput'), b = document.getElementById('endInput');
+                if (!a.value || b.value) { a.value = id; b.value = ''; showToast(`From: <b>${id}</b> — now click the destination`); }
+                else { b.value = id; showToast(`To: <b>${id}</b>`); runNavigation(); }
+            } else if (sec === 'emergency') {
+                const cat = getNodeCategory3D(id);
+                if (cat === 'junction' && document.getElementById('fireSub').classList.contains('visible') && setSelectValue('mlHazardNode', id)) {
+                    showToast(`Hazard set to <b>${id}</b>`);
+                } else if (setSelectValue('mlOrigin', id)) {
+                    document.getElementById('emergencyStart').value = id;
+                    showToast(`Origin set to <b>${id}</b>`);
+                } else {
+                    document.getElementById('emergencyStart').value = id;
+                    showToast(`<b>${id}</b> is not a room — click a room for the origin, or a junction for the hazard`);
+                }
+            } else if (sec === 'simulation') {
+                if (setSelectValue('simOrigin', id)) showToast(`Simulation origin: <b>${id}</b>`);
+                else if (setSelectValue('simHazardNode', id)) showToast(`Simulation hazard: <b>${id}</b>`);
+            } else {
+                showToast(`<b>${id}</b> · ${FLOOR_NAMES_3D[getNodeFloor3D(campusData.nodes[id].z)] || ''}`);
+            }
+        }
+
+        window.addEventListener('mousemove', (event) => {
+            const hits = pickNodeAt(event);
+            if (hits === null) { tooltipEl.style.display = 'none'; return; }
 
             if (hits.length > 0) {
                 const hit = hits[0].object;
                 const d = hit.userData;
                 if (d && d.id) {
                     const flLabel = FLOOR_NAMES_3D[d.floor] || `Floor ${d.floor}`;
-                    tooltipEl.innerHTML = `<div style="font-weight:700; color:#fff;">${d.id}</div><div style="font-size:0.85em; color:#38bdf8; margin-top:2px;">${flLabel} • ${d.category.toUpperCase()}</div>`;
+                    tooltipEl.innerHTML = `<div style="font-weight:700; color:#fff;">${d.id}</div><div style="font-size:0.85em; color:#38bdf8; margin-top:2px;">${flLabel} • ${d.category.toUpperCase()}</div><div style="font-size:0.75em; color:#64748b; margin-top:2px;">click to use</div>`;
                     tooltipEl.style.left = (event.clientX + 14) + 'px';
                     tooltipEl.style.top = (event.clientY + 14) + 'px';
                     tooltipEl.style.display = 'block';
@@ -953,6 +2120,7 @@
             tooltipEl.style.display = 'none';
             document.body.style.cursor = 'default';
         });
+        renderer.domElement.addEventListener('mouseleave', () => { tooltipEl.style.display = 'none'; });
 
         // --- 10. PATHFINDING LOGIC (DIJKSTRA) ---
         function findPath(startNodeId, endNodeId) {
@@ -1007,7 +2175,7 @@
             return path;
         }
 
-        // --- 6. STANDARD NAVIGATION VISUALIZATION ---
+        // --- 11. STANDARD NAVIGATION VISUALIZATION ---
         let currentPathMesh = null;
         let pathArrows = [];      
         let pathCurve = null;     
@@ -1066,25 +2234,43 @@
             const start = document.getElementById('startInput').value;
             const end = document.getElementById('endInput').value;
             
+            const info = document.getElementById('pathInfo');
             if (campusData.nodes[start] && campusData.nodes[end]) {
+                clearMLVisuals();
                 const path = findPath(start, end);
+                if (path.length < 2 || path[0] !== start) { info.innerHTML = '<span style="color:#f87171">No connection between these two nodes.</span>'; return; }
                 highlightPath(path);
-                document.getElementById('pathInfo').innerText = "Path: " + path.join(" → ");
+                let len = 0;
+                for (let i = 1; i < path.length; i++) {
+                    const a = campusData.nodes[path[i - 1]], b = campusData.nodes[path[i]];
+                    len += Math.hypot(a.x - b.x, a.y - b.y);
+                }
+                const fl = path.map(id => getNodeFloor3D(campusData.nodes[id].z));
+                const changes = fl.filter((f, i) => i > 0 && f !== fl[i - 1]).length;
+                info.innerHTML = `<b style="color:#fde047">${path.length - 1} steps</b> · ${Math.round(len)} px on plan · ${changes ? changes + ' floor change' + (changes > 1 ? 's' : '') : 'same floor'}<br>`
+                    + `<span style="color:#94a3b8">${path.join(' → ')}</span>`;
+                addLog(`Route ${start} → ${end}: ${path.length - 1} steps`);
             } else {
-                alert("Invalid node names! Check your campus_data.js");
+                const bad = !campusData.nodes[start] ? (start || '(empty start)') : (end || '(empty end)');
+                info.innerHTML = `<span style="color:#f87171">Unknown node: <b>${bad}</b>. Pick a name from the list or click a node.</span>`;
             }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // --- FEATURE 1 ML ROUTING INTEGRATION ---
-        // The browser does NOT calculate the ML route.
-        // It fetches the route from the Python Feature 1 backend and feeds it into
-        // the existing Three.js drawEmergencyPaths() visualization.
-        // ─────────────────────────────────────────────────────────────────────────
+        function swapNavEnds() {
+            const a = document.getElementById('startInput'), b = document.getElementById('endInput');
+            [a.value, b.value] = [b.value, a.value];
+            if (a.value && b.value) runNavigation();
+        }
 
-        // Hazard zone sphere (fire indicator) — removed/replaced on each call
+        function clearNav() {
+            document.getElementById('startInput').value = '';
+            document.getElementById('endInput').value = '';
+            document.getElementById('pathInfo').innerHTML = '';
+            clearMLVisuals();
+        }
+
+        // --- FEATURE 1 ML ROUTING INTEGRATION ---
         let hazardZoneMesh = null;
-        // Baseline (red/danger) ghost route shown alongside the ML route
         let baselineRouteMesh = null;
 
         function clearMLVisuals() {
@@ -1110,7 +2296,6 @@
         }
 
         function drawBaselineRoute(path) {
-            // Show the static baseline path in translucent red — "where you'd go without ML"
             const pts = path.map(id => {
                 const n = campusData.nodes[id];
                 return new THREE.Vector3(n.x / 100, n.z / 100, n.y / 100);
@@ -1123,7 +2308,6 @@
         }
 
         function animateCameraToPath(path) {
-            // Smoothly move camera look-target to the middle of the ML route
             if (!path || path.length === 0) return;
             const midId = path[Math.floor(path.length / 2)];
             const mid = campusData.nodes[midId];
@@ -1132,60 +2316,118 @@
             controls.update();
         }
 
-        // ── DYNAMIC FORM HELPERS ─────────────────────────────────────────────────
-
         function toggle2DTray() {
             const tray = document.getElementById('evac2dTray');
             const btn = document.getElementById('trayToggleBtn');
-            tray.classList.toggle('minimized');
-            btn.textContent = tray.classList.contains('minimized') ? '▼ Expand' : '▲ Minimize';
+            if (tray) {
+                tray.classList.toggle('minimized');
+                if (btn) btn.textContent = tray.classList.contains('minimized') ? '▼ Expand' : '▲ Minimize';
+            }
+        }
+
+        function toggle2DTrayMax() {
+            const tray = document.getElementById('evac2dTray');
+            const maxBtn = document.getElementById('trayMaxBtn');
+            const minBtn = document.getElementById('trayToggleBtn');
+
+            if (!tray) return;
+
+            const isMax = tray.classList.toggle('maximized');
+            if (isMax) {
+                tray.classList.remove('minimized');
+                if (maxBtn) maxBtn.textContent = '🗗 Restore';
+                if (minBtn) minBtn.textContent = '▲ Minimize';
+            } else {
+                if (maxBtn) maxBtn.textContent = '🗖 Maximize';
+            }
+
+            if (window.currentMLRouteData && window.currentMLRouteData.floor_segments) {
+                render2DFloorPlans(window.currentMLRouteData.floor_segments);
+            }
         }
 
         function close2DTray() {
-            document.getElementById('evac2dTray').style.display = 'none';
+            const tray = document.getElementById('evac2dTray');
+            document.getElementById('legend3d').style.display = '';
+            if (tray) {
+                tray.style.display = 'none';
+                tray.classList.remove('maximized');
+                const maxBtn = document.getElementById('trayMaxBtn');
+                if (maxBtn) maxBtn.textContent = '🗖 Maximize';
+            }
         }
 
-        // Show/hide hazard and crowd sub-panels based on selected emergency type
         function onEmergencyTypeChange() {
             const type = document.getElementById('mlEmergencyType').value;
             document.getElementById('fireSub').classList.toggle('visible',
                 type === 'fire' || type === 'multifloor_fire');
             document.getElementById('crowdSub').classList.toggle('visible',
                 type === 'crowd');
-            // Auto-set mobility checkbox for accessibility type
             if (type === 'accessibility') {
                 document.getElementById('mlMobility').checked = true;
             }
         }
 
-        // Populate origin and hazard/crowd node dropdowns from /api/nodes
-        async function loadNodeDropdowns() {
-            try {
-                const resp = await fetch('/api/nodes');
-                const data = await resp.json();
+        function localNodeGroups() {
+            const floor_rooms = {}, floor_junctions = {};
+            FLOORS.forEach(f => {
+                const nm = FLOOR_NAMES_3D[f] || ('Floor ' + f);
+                floor_rooms[nm] = []; floor_junctions[nm] = [];
+            });
+            Object.entries(campusData.nodes).forEach(([id, n]) => {
+                const nm = FLOOR_NAMES_3D[getNodeFloor3D(n.z)] || ('Floor ' + getNodeFloor3D(n.z));
+                const cat = getNodeCategory3D(id);
+                if (cat === 'room') floor_rooms[nm].push(id);
+                else if (cat === 'junction') floor_junctions[nm].push(id);
+            });
+            const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+            Object.values(floor_rooms).forEach(l => l.sort(natural));
+            Object.values(floor_junctions).forEach(l => l.sort(natural));
+            return { floor_rooms, floor_junctions };
+        }
 
-                // Origin dropdown — grouped by floor with optgroups
-                const originSel = document.getElementById('mlOrigin');
-                originSel.innerHTML = '';
-                
-                if (data.floor_rooms) {
-                    for (const [floorName, rooms] of Object.entries(data.floor_rooms)) {
-                        if (rooms.length === 0) continue;
-                        const optGroup = document.createElement('optgroup');
-                        optGroup.label = floorName;
-                        rooms.forEach(roomName => {
-                            const opt = document.createElement('option');
-                            opt.value = opt.textContent = roomName;
-                            if (roomName === 'classroom g17') opt.selected = true;
-                            optGroup.appendChild(opt);
-                        });
-                        originSel.appendChild(optGroup);
+        async function loadNodeDropdowns() {
+            const dl = document.getElementById('nodeList');
+            if (dl) dl.innerHTML = Object.keys(campusData.nodes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                .map(id => `<option value="${id}"></option>`).join('');
+            try {
+                let data;
+                if (IS_HOSPITAL) {
+                    data = localNodeGroups();
+                } else {
+                    try {
+                        const resp = await fetch('/api/nodes');
+                        if (!resp.ok) throw new Error(resp.status);
+                        data = await resp.json();
+                    } catch (err) {
+                        data = localNodeGroups();
                     }
                 }
 
-                // Hazard / crowd node dropdowns — grouped junctions across floors
-                ['mlHazardNode', 'mlCrowdNode'].forEach(selId => {
+                ['mlOrigin', 'simOrigin'].forEach(selId => {
+                    const originSel = document.getElementById(selId);
+                    if (!originSel) return;
+                    originSel.innerHTML = '';
+                    
+                    if (data.floor_rooms) {
+                        for (const [floorName, rooms] of Object.entries(data.floor_rooms)) {
+                            if (rooms.length === 0) continue;
+                            const optGroup = document.createElement('optgroup');
+                            optGroup.label = floorName;
+                            rooms.forEach(roomName => {
+                                const opt = document.createElement('option');
+                                opt.value = opt.textContent = roomName;
+                                if (roomName === DEFAULTS.origin) opt.selected = true;
+                                optGroup.appendChild(opt);
+                            });
+                            originSel.appendChild(optGroup);
+                        }
+                    }
+                });
+
+                ['mlHazardNode', 'simHazardNode', 'mlCrowdNode'].forEach(selId => {
                     const sel = document.getElementById(selId);
+                    if (!sel) return;
                     sel.innerHTML = '';
                     if (data.floor_junctions) {
                         for (const [floorName, juncs] of Object.entries(data.floor_junctions)) {
@@ -1195,8 +2437,8 @@
                             juncs.forEach(jName => {
                                 const opt = document.createElement('option');
                                 opt.value = opt.textContent = jName;
-                                if (selId === 'mlHazardNode' && jName === 'j6') opt.selected = true;
-                                if (selId === 'mlCrowdNode'  && jName === 'j2') opt.selected = true;
+                                if (selId.includes('Hazard') && jName === DEFAULTS.hazard) opt.selected = true;
+                                if (selId.includes('Crowd')  && jName === DEFAULTS.crowd) opt.selected = true;
                                 optGroup.appendChild(opt);
                             });
                             sel.appendChild(optGroup);
@@ -1208,9 +2450,7 @@
             }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
         // --- 2D FLOOR-BY-FLOOR CANVAS RENDERING ENGINE ---
-        // ─────────────────────────────────────────────────────────────────────────
         const imageCache = {};
 
         function preloadImage(url) {
@@ -1240,12 +2480,12 @@
             titleEl.textContent = `2D Floor-by-Floor Evacuation Guidance (${segments.length} Floor${segments.length > 1 ? 's' : ''} Traversed)`;
             tray.style.display = 'flex';
             tray.classList.remove('minimized');
+            document.getElementById('legend3d').style.display = 'none';
             document.getElementById('trayToggleBtn').textContent = '▲ Minimize';
 
             for (let i = 0; i < segments.length; i++) {
                 const seg = segments[i];
 
-                // Create floor card DOM
                 const card = document.createElement('div');
                 card.className = 'floor-card';
 
@@ -1262,7 +2502,6 @@
                 `;
                 strip.appendChild(card);
 
-                // Add connector arrow between floor steps
                 if (i < segments.length - 1) {
                     const conn = document.createElement('div');
                     conn.className = 'strip-connector';
@@ -1270,7 +2509,6 @@
                     strip.appendChild(conn);
                 }
 
-                // Render canvas contents
                 const canvas = card.querySelector('canvas');
                 drawFloorCanvas(canvas, seg);
             }
@@ -1280,7 +2518,6 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Loading state
             ctx.fillStyle = '#1e293b';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#94a3b8';
@@ -1298,28 +2535,23 @@
                 return;
             }
 
-            // Aspect ratio fitting
             const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
             const ox = (canvas.width - img.width * scale) / 2;
             const oy = (canvas.height - img.height * scale) / 2;
 
-            // 1. Draw floor plan background
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#0a0f1d';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, ox, oy, img.width * scale, img.height * scale);
 
-            // Subtle dark overlay to boost route contrast
             ctx.fillStyle = 'rgba(10, 15, 29, 0.25)';
             ctx.fillRect(ox, oy, img.width * scale, img.height * scale);
 
-            // 2. Draw Hazard Zone (if located on this floor)
             if (seg.hazard) {
                 const hx = ox + seg.hazard.x * scale;
                 const hy = oy + seg.hazard.y * scale;
                 const hr = (seg.hazard.radius || 280) * scale;
 
-                // Gradient danger circle
                 const grad = ctx.createRadialGradient(hx, hy, 4, hx, hy, hr);
                 grad.addColorStop(0, 'rgba(239, 68, 68, 0.7)');
                 grad.addColorStop(0.7, 'rgba(239, 68, 68, 0.25)');
@@ -1329,7 +2561,6 @@
                 ctx.arc(hx, hy, hr, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Danger border
                 ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([6, 4]);
@@ -1338,14 +2569,11 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Hazard badge label
                 drawPillBadge(ctx, hx, hy - hr - 14, `🔥 FIRE OUTBREAK (${seg.hazard.node})`, '#ef4444', '#ffffff');
             }
 
-            // 3. Draw Route Polyline & Directional Arrows
             const nodes = seg.nodes;
             if (nodes && nodes.length >= 2) {
-                // Glow shadow
                 ctx.shadowColor = '#22c55e';
                 ctx.shadowBlur = 14;
                 ctx.strokeStyle = '#22c55e';
@@ -1360,7 +2588,6 @@
                 }
                 ctx.stroke();
 
-                // Inner bright core
                 ctx.shadowBlur = 0;
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2;
@@ -1371,7 +2598,6 @@
                 }
                 ctx.stroke();
 
-                // Draw Directional Arrows along each path segment
                 for (let k = 0; k < nodes.length - 1; k++) {
                     const p1x = ox + nodes[k].x * scale;
                     const p1y = oy + nodes[k].y * scale;
@@ -1381,7 +2607,6 @@
                 }
             }
 
-            // 4. Draw Waypoints and Special Markers
             if (nodes) {
                 for (let k = 0; k < nodes.length; k++) {
                     const node = nodes[k];
@@ -1389,23 +2614,18 @@
                     const ny = oy + node.y * scale;
 
                     if (node.role === 'origin') {
-                        // Blue Start Marker
                         drawNodeCircle(ctx, nx, ny, 10, '#3b82f6', '#ffffff');
                         drawPillBadge(ctx, nx, ny - 20, `📍 YOU ARE HERE (${node.id})`, '#3b82f6', '#ffffff');
                     } else if (node.role === 'exit') {
-                        // Green Exit Marker
                         drawNodeCircle(ctx, nx, ny, 12, '#10b981', '#ffffff');
                         drawPillBadge(ctx, nx, ny + 24, `🚪 SAFE EXIT: ${node.id}`, '#10b981', '#ffffff');
                     } else if (node.role === 'transition_stair') {
-                        // Amber Stairs Transition Marker
                         drawNodeCircle(ctx, nx, ny, 9, '#f59e0b', '#ffffff');
                         drawPillBadge(ctx, nx, ny - 18, `🪜 ${node.label}`, '#f59e0b', '#000000');
                     } else if (node.role === 'transition_lift') {
-                        // Cyan Lift Transition Marker
                         drawNodeCircle(ctx, nx, ny, 9, '#06b6d4', '#ffffff');
                         drawPillBadge(ctx, nx, ny - 18, `🛗 ${node.label}`, '#06b6d4', '#000000');
                     } else {
-                        // Small waypoint dot
                         ctx.fillStyle = '#22c55e';
                         ctx.beginPath();
                         ctx.arc(nx, ny, 4, 0, Math.PI * 2);
@@ -1443,9 +2663,8 @@
             const dx = toX - fromX;
             const dy = toY - fromY;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 28) return; // Skip tiny segments
+            if (dist < 28) return;
 
-            // Midpoint position for arrow
             const mx = fromX + dx * 0.55;
             const my = fromY + dy * 0.55;
             const angle = Math.atan2(dy, dx);
@@ -1479,7 +2698,6 @@
             const rx = x - w / 2;
             const ry = y - h / 2;
 
-            // Background pill
             ctx.fillStyle = bg;
             ctx.shadowColor = 'rgba(0,0,0,0.6)';
             ctx.shadowBlur = 8;
@@ -1487,13 +2705,11 @@
             ctx.roundRect(rx, ry, w, h, 6);
             ctx.fill();
 
-            // Border
             ctx.shadowBlur = 0;
             ctx.strokeStyle = 'rgba(255,255,255,0.4)';
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // Text
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -1501,8 +2717,9 @@
             ctx.restore();
         }
 
-        // ── MAIN ML EVACUATION CALL ──────────────────────────────────────────────
+        // --- MAIN ML EVACUATION CALL (STATIC EMERGENCY PANEL ONLY) ---
         async function runMLEvacuation() {
+            if (IS_HOSPITAL) return runHospitalRoute();
             const origin        = document.getElementById('mlOrigin').value.trim();
             const emergencyType = document.getElementById('mlEmergencyType').value;
             const hazardNode    = document.getElementById('mlHazardNode').value.trim();
@@ -1514,10 +2731,8 @@
             const mobilityImp   = document.getElementById('mlMobility').checked;
             const isMultiFloor  = origin.startsWith('f') || emergencyType === 'accessibility' || emergencyType === 'multifloor_fire';
 
-            if (!origin) { alert('Please select an origin node.'); return; }
+            if (!origin) { alert('Please select an origin node.'); return null; }
 
-            // ── Build the dynamic API payload ─────────────────────────────────────
-            // Every field is taken directly from the UI — no scenario key is sent.
             const payload = {
                 origin,
                 emergency_type:   emergencyType,
@@ -1531,7 +2746,6 @@
                 multi_floor:      isMultiFloor,
             };
 
-            // UI loading state
             document.getElementById('mlBtn').disabled = true;
             document.getElementById('mlSpinner').style.display = 'block';
             document.getElementById('mlMetrics').style.display = 'none';
@@ -1550,29 +2764,26 @@
                     throw new Error(err.detail || 'Server error');
                 }
                 data = await resp.json();
+                window.currentMLRouteData = data;
             } catch (e) {
                 alert('ML Routing Error: ' + e.message);
                 document.getElementById('mlBtn').disabled = false;
                 document.getElementById('mlSpinner').style.display = 'none';
-                return;
+                return null;
             }
 
             document.getElementById('mlBtn').disabled = false;
             document.getElementById('mlSpinner').style.display = 'none';
 
-            // ─── Draw hazard zone sphere if the backend placed one ───────────────
             if (data.hazard_zone_node && data.hazard_zone_radius) {
                 drawHazardZone(data.hazard_zone_node, data.hazard_zone_radius);
             }
-            // ─── Show baseline route (red ghost) when path changed ───────────────
             if (data.path_changed_from_baseline && data.baseline_route && data.baseline_route.length > 1) {
                 drawBaselineRoute(data.baseline_route);
             }
-            // ─── Draw ML primary route via existing renderer ─────────────────────
             drawEmergencyPaths([{ path: data.primary_route, id: data.recommended_exit, dist: data.ml_cost }]);
             animateCameraToPath(data.primary_route);
 
-            // ─── Update result metrics ────────────────────────────────────────────
             const isSafe = data.status === 'SAFE';
             document.getElementById('mExit').textContent    = data.recommended_exit;
             document.getElementById('mDist').textContent    = data.physical_distance.toFixed(1) + ' px';
@@ -1581,7 +2792,6 @@
             document.getElementById('mCrowd').textContent   = (data.average_crowd * 100).toFixed(1) + '%';
             document.getElementById('mChanged').textContent = data.path_changed_from_baseline ? 'YES — Rerouted!' : 'No (same as baseline)';
             document.getElementById('mChanged').style.color = data.path_changed_from_baseline ? '#fb923c' : '#94a3b8';
-            // Echo-back: what the backend actually used (confirms no hardcoding)
             document.getElementById('mOriginUsed').textContent  = data.origin || origin;
             document.getElementById('mHazardUsed').textContent  = data.hazard_node || 'none';
             document.getElementById('mCrowdUsed').textContent   = data.crowd_node  || 'none';
@@ -1589,7 +2799,7 @@
             document.getElementById('mRoute').innerHTML = '<b>ML Route:</b> ' + data.primary_route.join(' &rarr; ');
 
             const statusEl = document.getElementById('mlStatus');
-            statusEl.textContent   = isSafe ? '\u2713 SAFE EVACUATION ROUTE' : '\u26a0 DANGER \u2014 CHECK ROUTE';
+            statusEl.textContent   = isSafe ? '✓ SAFE EVACUATION ROUTE' : '⚠️ DANGER — CHECK ROUTE';
             statusEl.className     = isSafe ? 'status-safe' : 'status-danger';
             statusEl.style.display = 'block';
             document.getElementById('mlMetrics').style.display = 'block';
@@ -1598,26 +2808,125 @@
                 `<span style="color:#4ade80; font-weight:bold;">ML Exit: ${data.recommended_exit}</span><br>`
                 + `<span style="font-size:0.85em; color:#94a3b8;">Emergency: ${data.emergency_type}</span>`;
 
-            // ─── Render 2D floor-by-floor route cards ─────────────────────────────
+            const badge = document.getElementById('platformStatusBadge');
+            const badgeText = document.getElementById('platformStatusText');
+            badge.className = isSafe ? 'status-badge alert-active' : 'status-badge alert-active';
+            badgeText.innerText = `EMERGENCY ALERT — EXIT: ${data.recommended_exit.toUpperCase()}`;
+
             if (data.floor_segments && data.floor_segments.length > 0) {
                 render2DFloorPlans(data.floor_segments);
             }
+            addLog(`ML route ${data.origin || origin} → <b>${data.recommended_exit}</b>${data.path_changed_from_baseline ? ' (rerouted)' : ''}`, 'var(--accent-orange)');
+
+            return data;
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // --- 7. EMERGENCY ROUTING VISUALIZATION (original static Dijkstra) ---
-        // Kept intact as fallback / debug reference.
-        // ─────────────────────────────────────────────────────────────────────────
+        // Hospital: safe-shortest route from the research engine (evac/api.py, served by research_server.py)
+        async function signsCall(body) {
+            const resp = await fetch('/api/research/signs', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            if (!resp.ok) throw new Error(resp.status === 404 ? 'not found' : ('HTTP ' + resp.status));
+            return resp.json();
+        }
+
+        async function runHospitalRoute() {
+            const origin   = document.getElementById('mlOrigin').value.trim();
+            const type     = document.getElementById('mlEmergencyType').value;
+            const fireOn   = (type === 'fire' || type === 'multifloor_fire');
+            const hazard   = document.getElementById('mlHazardNode').value.trim();
+            const radius   = parseFloat(document.getElementById('mlHazardRadius').value);
+            const stepFree = document.getElementById('mlMobility').checked || type === 'accessibility';
+            if (!origin) { showToast('Pick an origin room first'); return null; }
+
+            const btn = document.getElementById('mlBtn');
+            btn.disabled = true;
+            document.getElementById('mlSpinner').style.display = 'block';
+            document.getElementById('mlMetrics').style.display = 'none';
+            document.getElementById('mlStatus').style.display = 'none';
+            clearMLVisuals();
+            close2DTray();
+
+            let res, base;
+            try {
+                [res, base] = await Promise.all([
+                    signsCall({ building: 'hospital', fire_node: fireOn ? hazard : null, fire_radius: radius, step_free: stepFree, kiosk_node: origin }),
+                    signsCall({ building: 'hospital', fire_node: null, step_free: stepFree, kiosk_node: origin }),
+                ]);
+            } catch (e) {
+                btn.disabled = false;
+                document.getElementById('mlSpinner').style.display = 'none';
+                const st = document.getElementById('mlStatus');
+                st.className = 'status-danger';
+                st.innerHTML = 'Hospital routing needs the research engine.<br><span style="font-weight:400">Start the dashboard with <code>python research_server.py</code></span>';
+                st.style.display = 'block';
+                return null;
+            }
+            btn.disabled = false;
+            document.getElementById('mlSpinner').style.display = 'none';
+
+            const k = res.kiosk || {};
+            const path = k.path;
+            const basePath = base.kiosk && base.kiosk.path;
+            if (fireOn && hazard) drawHazardZone(hazard, radius);
+
+            const statusEl = document.getElementById('mlStatus');
+            if (!path) {
+                statusEl.className = 'status-danger';
+                statusEl.textContent = '⚠️ ' + (k.message || 'No safe route');
+                statusEl.style.display = 'block';
+                document.getElementById('platformStatusText').innerText = 'NO SAFE ROUTE — DEFEND IN PLACE';
+                document.getElementById('platformStatusBadge').className = 'status-badge alert-active';
+                addLog(`No safe route from ${origin}`, 'var(--accent-red)');
+                return res;
+            }
+
+            const changed = !!basePath && basePath.join('|') !== path.join('|');
+            if (changed && basePath.length > 1) drawBaselineRoute(basePath);
+            drawEmergencyPaths([{ path: path, id: k.exit, dist: 0 }]);
+            animateCameraToPath(path);
+
+            let len = 0;
+            for (let i = 1; i < path.length; i++) {
+                const a = campusData.nodes[path[i - 1]], b = campusData.nodes[path[i]];
+                if (a && b) len += Math.hypot(a.x - b.x, a.y - b.y);
+            }
+            const peak = Math.max(0, ...path.map(n => (res.hazard && res.hazard[n]) || 0));
+            document.getElementById('mExit').textContent    = k.exit;
+            document.getElementById('mDist').textContent    = Math.round(len) + ' px';
+            document.getElementById('mCost').textContent    = (path.length - 1) + ' steps';
+            document.getElementById('mHazard').textContent  = (peak * 100).toFixed(1) + '%';
+            document.getElementById('mCrowd').textContent   = 'see Research Lab';
+            document.getElementById('mChanged').textContent = changed ? 'YES — avoids the fire' : 'No (same as no-fire route)';
+            document.getElementById('mChanged').style.color = changed ? '#fb923c' : '#94a3b8';
+            document.getElementById('mOriginUsed').textContent  = origin;
+            document.getElementById('mHazardUsed').textContent  = fireOn ? hazard : 'none';
+            document.getElementById('mCrowdUsed').textContent   = 'n/a';
+            document.getElementById('mMobilityUsed').textContent = stepFree ? 'Yes (ramp / no stairs)' : 'No';
+            document.getElementById('mRoute').innerHTML = `<b>Sign says:</b> ${k.message}<br><br><b>Route:</b> ` + path.join(' &rarr; ');
+
+            statusEl.className = peak > 0 ? 'status-danger' : 'status-safe';
+            statusEl.textContent = peak > 0 ? '⚠️ ROUTE PASSES NEAR SMOKE — CHECK' : '✓ SAFE EVACUATION ROUTE';
+            statusEl.style.display = 'block';
+            document.getElementById('mlMetrics').style.display = 'block';
+            document.getElementById('platformStatusBadge').className = 'status-badge alert-active';
+            document.getElementById('platformStatusText').innerText = `EMERGENCY ALERT — EXIT: ${k.exit.replace(/^g_/, '').toUpperCase()}`;
+            addLog(`Route ${origin} → <b>${k.exit}</b>${changed ? ' (avoids fire)' : ''}`, 'var(--accent-orange)');
+            return res;
+        }
+
+        // --- 7. EMERGENCY ROUTING VISUALIZATION (STATIC DIJKSTRA) ---
         let currentEmergencyMeshes = [];
-        const exitNodes = ['east entrance/exit', 'north entrance/exit', 'east main entrance', 'north main entrance'];
+        const exitNodes = EXITS;
 
         function runEmergency() {
             const start = document.getElementById('emergencyStart').value;
             
             if (!campusData.nodes[start]) {
-                alert("Invalid starting location!");
+                showToast(start ? `Unknown location <b>${start}</b>` : 'Type or click a starting location');
                 return;
             }
+            clearMLVisuals();
 
             const nodes = campusData.nodes;
             const edges = campusData.edges;
@@ -1665,6 +2974,7 @@
             });
 
             allEscapePaths.sort((a, b) => a.dist - b.dist);
+            if (allEscapePaths.length === 0) { showToast('No exit reachable from here'); return; }
             drawEmergencyPaths(allEscapePaths);
             
             document.getElementById('pathInfo').innerHTML = `<span style="color:#2ca02c; font-weight:bold;">Primary Exit (Green): ${allEscapePaths[0].id}</span><br><span style="color:#ff4d4d; font-size: 0.9em;">Alternative Exits (Red)</span>`;
@@ -1724,6 +3034,119 @@
                 });
             }
 
+            // --- DYNAMIC OCCUPANT SIMULATION & LIVE CROWD MONITORING LOOP ---
+            if (simulatedOccupants.length > 0 && !isSimPaused) {
+                const speedMultiplier = parseFloat(document.getElementById('simSpeed') ? document.getElementById('simSpeed').value : 1.0);
+                
+                // Real-time Node Occupancy Counter for Monitored Locations
+                const realTimeNodeOccupancy = {};
+                for (const nodeId of Object.keys(MONITORED_NODES)) {
+                    realTimeNodeOccupancy[nodeId] = 0;
+                }
+
+                // Track active occupants per segment for crowding slowdown
+                const segmentCounts = {};
+                simulatedOccupants.forEach(occ => {
+                    if (occ.state === 'evacuating' && occ.routePath) {
+                        const currNode = occ.routePath[occ.segmentIndex];
+                        const nextNode = occ.routePath[occ.segmentIndex + 1];
+
+                        if (currNode && MONITORED_NODES[currNode]) realTimeNodeOccupancy[currNode]++;
+                        if (nextNode && MONITORED_NODES[nextNode] && occ.progress > 0.5) realTimeNodeOccupancy[nextNode]++;
+
+                        const segKey = `${occ.segmentIndex}`;
+                        segmentCounts[segKey] = (segmentCounts[segKey] || 0) + 1;
+                    }
+                });
+
+                let activeCount = 0;
+
+                simulatedOccupants.forEach(occ => {
+                    if (occ.state === 'evacuated') return;
+
+                    if (occ.delay > 0) {
+                        occ.delay -= 1;
+                        return;
+                    }
+
+                    if (occ.state === 'waiting') {
+                        occ.state = 'evacuating';
+                    }
+
+                    activeCount++;
+
+                    const segKey = `${occ.segmentIndex}`;
+                    const localDensity = segmentCounts[segKey] || 1;
+                    const crowdSpeedFactor = localDensity > 4 ? 0.75 : 1.0;
+
+                    occ.progress += occ.speed * speedMultiplier * crowdSpeedFactor;
+
+                    if (occ.progress >= 1.0) {
+                        occ.segmentIndex++;
+                        occ.progress = 0;
+
+                        if (occ.segmentIndex >= occ.points.length - 1) {
+                            occ.state = 'evacuated';
+                            occ.mesh.visible = false;
+                            simOccupantsEvacuated++;
+                            return;
+                        }
+                    }
+
+                    const p1 = occ.points[occ.segmentIndex];
+                    const p2 = occ.points[occ.segmentIndex + 1];
+                    if (p1 && p2) {
+                        const pos = p1.clone().lerp(p2, occ.progress).add(occ.lateralVector);
+                        pos.y += 0.45 + Math.sin(Date.now() * 0.01 + occ.speed * 100) * 0.05;
+                        occ.mesh.position.copy(pos);
+                    }
+                });
+
+                document.getElementById('simTransitVal').textContent = activeCount;
+                document.getElementById('simEvacuatedVal').textContent = `${simOccupantsEvacuated} / ${simTotalOccupants}`;
+
+                if (activeCount === 0 && simOccupantsEvacuated >= simTotalOccupants) {
+                    document.getElementById('simStatusDesc').innerHTML = `<span style="color:#4ade80; font-weight:bold;">✅ ALL ${simTotalOccupants} OCCUPANTS EVACUATED SAFELY!</span>`;
+                }
+
+                // Render Live Crowd Monitoring Panel
+                const crowdListEl = document.getElementById('crowdNodeList');
+                if (crowdListEl) {
+                    let html = '';
+                    for (const [nodeId, meta] of Object.entries(MONITORED_NODES)) {
+                        const currentOcc = realTimeNodeOccupancy[nodeId] || 0;
+                        const pct = Math.min(100, Math.round((currentOcc / meta.capacity) * 100));
+                        
+                        let statusBadge = '<span class="badge-exit">CLEAR</span>';
+                        let barColor = '#10b981';
+                        if (pct >= 75) {
+                            statusBadge = '<span class="badge-origin" style="background:rgba(239,68,68,0.25); color:#f87171; border-color:rgba(239,68,68,0.5); font-weight:800; animation:statusPulse 1s infinite;">🚨 HIGH CONGESTION</span>';
+                            barColor = '#ef4444';
+                        } else if (pct >= 40) {
+                            statusBadge = '<span class="badge-transfer">MODERATE</span>';
+                            barColor = '#facc15';
+                        }
+
+                        html += `
+                            <div class="crowd-node-card">
+                                <div class="crowd-node-header">
+                                    <span>${meta.name}</span>
+                                    ${statusBadge}
+                                </div>
+                                <div class="crowd-node-bar-container">
+                                    <div class="crowd-node-bar" style="width: ${pct}%; background-color: ${barColor};"></div>
+                                </div>
+                                <div class="crowd-node-footer">
+                                    <span>Category: ${meta.category}</span>
+                                    <span><b>${currentOcc}</b> / ${meta.capacity} (${pct}%)</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    crowdListEl.innerHTML = html;
+                }
+            }
+
             if (typeof currentEmergencyMeshes !== 'undefined' && currentEmergencyMeshes.length > 0) {
                 const sirenPulse = 0.6 + Math.sin(Date.now() * 0.015) * 0.6; 
                 currentEmergencyMeshes.forEach(mesh => {
@@ -1736,7 +3159,92 @@
 
         animate();
 
-        // Populate node dropdowns from the Python API when page first loads
+        // Handle window resize cleanly
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('canvas-container');
+            const w = container.clientWidth || (window.innerWidth - 436);
+            const h = container.clientHeight || window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        });
+
+        // ── PAGE INIT: building switch, floors, legend, overview ──
+        function buildFloorControls() {
+            const bar = document.getElementById('floorPillBar');
+            const list = document.getElementById('bldgFloorList');
+            const desc = [...FLOORS].reverse();
+            bar.innerHTML = `<button class="floor-pill active" data-floor="all" onclick="setFloorFilter('all')">🏢 All ${FLOORS.length}</button>`
+                + desc.map(f => `<button class="floor-pill" data-floor="${f}" onclick="setFloorFilter(${f})">${f === 0 ? 'G' : 'F' + f}</button>`).join('');
+            list.innerHTML = `<button class="floor-pill active" data-floor="all" onclick="setFloorFilter('all')">🏢 Show all ${FLOORS.length} floors</button>`
+                + desc.map(f => {
+                    const col = '#' + (FLOOR_COLORS_3D[f] || 0xffffff).toString(16).padStart(6, '0');
+                    const n = Object.values(campusData.nodes).filter(p => getNodeFloor3D(p.z) === f).length;
+                    return `<button class="floor-pill" data-floor="${f}" onclick="setFloorFilter(${f})" style="text-align:left; border-left:4px solid ${col}">`
+                         + `${FLOOR_NAMES_3D[f] || 'Floor ' + f} <span style="float:right; opacity:0.6">${n} nodes</span></button>`;
+                }).join('');
+        }
+
+        function buildLegend() {
+            const items = [
+                ['sw', 'linear-gradient(135deg,#f87171,#38bdf8,#818cf8)', 'Room (floor colour)'],
+                ['sw', '#94a3b8', 'Corridor junction'],
+                ['sw sq', '#f59e0b', 'Stairs'],
+                ['sw sq', '#06b6d4', 'Lift (not used in fire)'],
+            ];
+            if (Object.keys(campusData.nodes).some(id => getNodeCategory3D(id) === 'ramp')) items.push(['sw sq', '#a855f7', 'Ramp (step-free)']);
+            items.push(['sw', '#10b981', 'Exit'], ['sw bar', '#22c55e', 'Evacuation route'], ['sw bar', '#ff4444', 'Route without fire'],
+                       ['sw', 'rgba(255,34,0,0.55)', 'Fire / smoke zone'], ['sw bar', '#ffff00', 'Navigation route']);
+            document.getElementById('legend3d').innerHTML = '<div class="lg-title">LEGEND</div>'
+                + items.map(([c, bg, t]) => `<div class="lg"><span class="${c}" style="background:${bg}"></span>${t}</div>`).join('');
+        }
+
+        async function initOverview() {
+            const ids = Object.keys(campusData.nodes);
+            const count = c => ids.filter(id => getNodeCategory3D(id) === c).length;
+            document.getElementById('ovNodes').textContent = ids.length;
+            document.getElementById('ovFloors').textContent = FLOORS.length;
+            document.getElementById('ovRooms').textContent = count('room');
+            document.getElementById('ovExits').textContent = EXITS.filter(e => campusData.nodes[e]).length;
+            document.getElementById('ovVert').textContent = `${count('stairs')} · ${count('lift')} · ${count('ramp')}`;
+            document.getElementById('ovEdges').textContent = campusData.edges.length;
+            document.getElementById('ovSub').textContent = BUILDING_TITLE;
+            document.getElementById('ovChip').textContent = IS_HOSPITAL ? 'Hospital' : 'Campus';
+            document.getElementById('brandSub').textContent = 'Evacuation Platform · ' + BUILDING_TITLE;
+            document.title = (IS_HOSPITAL ? 'Hospital' : 'Campus') + ' · Evacuation 3D Dashboard';
+            document.querySelectorAll('#bldgSwitch button').forEach(b => b.classList.toggle('active', b.dataset.b === window.BUILDING));
+            const opt = document.getElementById('optAllFloors');
+            if (opt) opt.textContent = `Building-wide (all ${FLOORS.length} floors)`;
+            if (IS_HOSPITAL) {
+                document.getElementById('emSub').textContent = 'Research engine · safe shortest path, fire- and step-free-aware';
+                const oc = document.getElementById('optCrowd');
+                if (oc) oc.remove();
+                document.getElementById('mlBtn').textContent = '⚡ Find Evacuation Route';
+                document.getElementById('mCost').previousElementSibling.textContent = 'Route length';
+                const hi = document.getElementById('mlHazardIntensity');
+                if (hi) { hi.closest('.slider-row').style.display = 'none'; hi.closest('.slider-row').previousElementSibling.style.display = 'none'; }
+            }
+            addLog(`${BUILDING_TITLE}: ${ids.length} nodes, ${campusData.edges.length} links, ${FLOORS.length} floors loaded`);
+
+            const box = document.getElementById('ovFindings');
+            try {
+                const r = await fetch('/api/research/results?building=' + window.BUILDING);
+                if (!r.ok) throw new Error(r.status);
+                const data = await r.json();
+                const fmt = t => {
+                    t = t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '$1');
+                    return t.length > 260 ? t.slice(0, 257).replace(/\s+\S*$/, '') + '…' : t;
+                };
+                box.innerHTML = (data.findings || []).slice(0, 3).map(f => `<div class="finding">${fmt(f)}</div>`).join('')
+                    || '<div class="muted-note">No results file yet — run the experiments (see the README).</div>';
+            } catch (e) {
+                box.innerHTML = '<div class="muted-note">Findings come from the research engine. Start the dashboard with <code>python research_server.py</code> to see them here.</div>';
+            }
+        }
+
+        buildFloorControls();
+        buildLegend();
+        initOverview();
         loadNodeDropdowns();
     </script>
 </body>
