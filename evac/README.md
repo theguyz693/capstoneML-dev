@@ -29,6 +29,18 @@ python tests/test_evac_session4.py                      # behaviour + spreading 
 python tests/test_evac_session5.py                      # replay, signs, weak spots, API
 python -m evac.weakspots --scenario floor3_full_200      # single-failure ranking -> docs/weakspots.md
 python -m evac.delay_model                              # ML: generate simulator data, train, compare vs formula (needs scikit-learn)
+python tests/test_evac_session6.py                      # ML-in-loop, GA, sensitivity, ablation checks
+```
+
+### Session 6 (research depth)
+```bash
+pip install lightgbm shap optuna SALib pandas matplotlib scikit-learn joblib scipy
+python -m evac.ml_study            # model comparison (grouped CV), learning curve, SHAP, conformal -> docs/ml_study.md, models/
+python -m evac.sensitivity         # Morris sensitivity over 9 physical assumptions (~10 min) -> docs/sensitivity.md
+python -m evac.tune --trials 30    # Bayesian optimisation of planner settings (~5 min) -> docs/tuning.md
+python -m evac.ga                  # genetic-algorithm exit assignment (offline benchmark)
+python -m evac.final_experiments   # full matrix: 30 seeds, ML-in-loop, GA, bound, tipping, freshness, ablations (~1 h, 2 cores)
+python -m evac.final_report        # tables + figures -> docs/final_results.md
 ```
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
 
@@ -49,6 +61,12 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `delay_model.py` | Learned edge-delay predictor trained on simulator data; scenario/fire-location splits vs formulas. |
 | `weakspots.py` | Blocks each stairwell / exit door / key corridor in turn and ranks the damage (N-1 analysis). |
 | `api.py` | FastAPI endpoints for the dashboard (`/api/research/...`), mounted by `research_server.py`. |
+| `ml_study.py` | Grouped-CV comparison (formula, ridge, RF, LightGBM, MLP), learning curve, SHAP, split-conformal + CQR intervals. |
+| `learned_planner.py` | ML in the loop: re-route on predicted edge delays (formula / LightGBM / LightGBM 95% upper bound); learned walk times for the planner. |
+| `sensitivity.py` | Morris elementary-effects sensitivity of results to every physical assumption. |
+| `tune.py` | Optuna (TPE) tuning of planner settings with held-out check. |
+| `ga.py` | Genetic algorithm over exit assignments (fitness = full simulation). |
+| `final_experiments.py` / `final_report.py` | Final experiment matrix and the report generator. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.
@@ -62,6 +80,9 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `reactive` | Starts as `safe_shortest`; every 5 s reroutes people whose route crosses a visible queue (≥ 8 people). No prediction. |
 | `ccrp` | **Capacity booking (main contribution).** Plans everyone once, in order of readiness; each person takes the earliest-arrival route given door/stair capacity already booked by others (Capacity Constrained Route Planner, Lu et al. 2005). |
 | `lookahead` | **Rolling-horizon re-planning (main contribution).** Re-books capacity every 5 s from where people really are, predicting 300 s ahead. Switches someone only if ≥ 15% faster, never by walking back. |
+| `lookahead_ml` | `lookahead` with walking times from the LightGBM delay model instead of the formula. |
+| `pred_formula` / `pred_ml` / `pred_ml_upper` | Same re-routing controller driven by three different delay predictors (queue formula, LightGBM, LightGBM 95% quantile). Isolates the value of prediction. |
+| `ga` | Genetic algorithm exit plan (offline; hundreds of simulations). Via `evac.ga.optimise`. |
 | `optimum` | **Theoretical best** last-out time (quickest flow on a time-expanded network). A lower bound — not a method anyone can follow. ~20–40 s to compute. |
 
 ## Hard safety rules (applied before any cost)
@@ -89,7 +110,9 @@ speed–density relation), not measurements of this building.
 | `fires[].spread_m_per_s`, `max_radius` | a fire that grows over time; smoke climbs stair shafts 30 s per floor |
 | `log_edges` | record every edge crossing (features + actual time) for the ML model |
 
-## Findings so far (preliminary, see `docs/`)
+## Findings
+Final numbers: `docs/final_results.md` (30 paired seeds, CIs, Holm-corrected Wilcoxon tests). Also `docs/ml_study.md`,
+`docs/sensitivity.md`, `docs/tuning.md`. Earlier preliminary notes:
 - Smarter routing only matters when crowds are concentrated (a full hall or floor). Spread over 7 floors, all methods tie.
 - Reactive rerouting helps but oscillates: ~1,000 route changes for 120 people in the seminar-hall case.
 - Capacity booking cuts last-out time by ~35–40% in concentrated scenarios with almost no route changes.

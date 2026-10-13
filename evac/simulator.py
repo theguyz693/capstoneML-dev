@@ -29,6 +29,7 @@ from .building import room_nodes
 from .hazard import apply_hazard, is_dynamic
 from .routing import route_table, congestion_route_table
 from . import planner
+from . import learned_planner
 
 
 from .physics import weidmann_speed_factor  # noqa: E402  (re-exported for older imports)
@@ -185,7 +186,12 @@ def run(G, scenario, method, seed):
     edge_rows = []
 
     # routes: one multi-source Dijkstra per (method, step_free) covers every origin
-    base = "safe_shortest" if method in ("reactive", "ccrp", "lookahead") else method
+    base = "safe_shortest" if method in ("reactive", "ccrp", "lookahead", "lookahead_ml") or method.startswith("pred_") else method
+    if method == "lookahead_ml":
+        edge_index = learned_planner.EdgeIndex(G)
+    if method.startswith("pred_"):
+        pred_kind = method[len("pred_"):]          # formula | ml | ml_upper
+        edge_index = learned_planner.EdgeIndex(G)
     tables = {
         False: route_table(G, base, fire_active, step_free=False),
         True: route_table(G, base, fire_active, step_free=True),
@@ -212,12 +218,29 @@ def run(G, scenario, method, seed):
             if p:
                 a.path, a.exit = p, p[-1]
 
+    # optional fixed exit assignment per origin room (used by the genetic-algorithm baseline)
+    exit_plan = scenario.get("exit_plan")
+    if exit_plan:
+        cache = {}
+        for a in agents:
+            tgt = exit_plan.get(f"{a.origin}#{a.id % 4}", exit_plan.get(a.origin))
+            if a.path is None or not a.compliant or tgt is None:
+                continue
+            key = (tgt, a.step_free)
+            if key not in cache:
+                cache[key] = route_table(G, "safe_shortest", fire_active, a.step_free, targets=[tgt])
+            p = cache[key].get(a.origin)
+            if p:
+                a.path, a.exit = p, p[-1]
+
     horizon = float(scenario.get("horizon_s", C.HORIZON_S))
     switch_gain = float(scenario.get("switch_gain", C.SWITCH_GAIN))
-    if method in ("ccrp", "lookahead"):
+    if method in ("ccrp", "lookahead", "lookahead_ml"):
         plannable = [a for a in agents if a.path is not None and a.compliant]
+        walk0 = (learned_planner.walk_predictions(G, edge_index, agents, {}, {})
+                 if method == "lookahead_ml" else None)
         plans = planner.plan_all(G, plannable, fire_active,
-                                 horizon=math.inf if method == "ccrp" else horizon)
+                                 horizon=math.inf if method == "ccrp" else horizon, walk=walk0)
         for a in plannable:
             if a.id in plans:
                 a.path = plans[a.id]
@@ -302,10 +325,15 @@ def run(G, scenario, method, seed):
         if method == "reactive" and t >= next_reroute:
             next_reroute += C.REROUTE_INTERVAL_S
             _reactive_reroute(G, fire_active, queues, occ, [a for a in active if a.compliant])
-        elif method == "lookahead" and t >= next_reroute:
+        elif method.startswith("pred_") and t >= next_reroute:
+            next_reroute += C.REPLAN_S
+            learned_planner.replan(G, edge_index, pred_kind, agents, queues, occ, active, fire_active, switch_gain)
+        elif method in ("lookahead", "lookahead_ml") and t >= next_reroute:
             next_reroute += C.REPLAN_S
             standing = [a for q in queues.values() for a in q] + list(active)
-            planner.replan(G, agents, moving, standing, t, fire_active, horizon, switch_gain)
+            walk = (learned_planner.walk_predictions(G, edge_index, agents, queues, occ)
+                    if method == "lookahead_ml" else None)
+            planner.replan(G, agents, moving, standing, t, fire_active, horizon, switch_gain, walk=walk)
         # flow budgets refill
         for u, v, d in G.edges(data=True):
             k = _ekey(u, v)

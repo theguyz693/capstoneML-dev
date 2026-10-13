@@ -35,18 +35,26 @@ from .routing import _allowed, _hazard_penalty
 class Reservations:
     """Booked entries per (directed edge, time slot)."""
 
-    def __init__(self, G, now=0.0, horizon=math.inf):
+    def __init__(self, G, now=0.0, horizon=math.inf, walk=None):
         self.G = G
+        self.walk = walk or {}     # optional learned walking time per directed edge (lookahead_ml)
         self.book = defaultdict(int)
         self.now = now
         self.horizon = horizon
 
     def cap(self, d):
-        return max(1, int(d["eff_cap"] * C.SLOT_S))
+        cap = d["eff_cap"] if C.PLANNER_USE_SUSTAINABLE_CAP else d["flow_cap"]
+        return max(1, int(cap * C.SLOT_S))
+
+    @staticmethod
+    def slot(t):
+        # small tolerance: s * SLOT_S computed in floating point (e.g. 3 * 4.1 = 12.299999...) must map
+        # back to slot s, or bookings land in the previous (full) slot and capacity is overbooked
+        return int(math.floor(t / C.SLOT_S + 1e-9))
 
     def entry_time(self, u, v, d, t):
         """Earliest time >= t at which one more person can enter u->v."""
-        s = int(t // C.SLOT_S)
+        s = self.slot(t)
         c = self.cap(d)
         while True:
             if s * C.SLOT_S > self.now + self.horizon:   # beyond horizon: not predicted
@@ -56,19 +64,21 @@ class Reservations:
             s += 1
 
     def reserve(self, u, v, t):
-        self.book[(u, v, int(t // C.SLOT_S))] += 1
+        self.book[(u, v, self.slot(t))] += 1
 
 
 def _walk_time(d, speed_mult=1.0):
     return d["length_m"] / (d["free_speed"] * speed_mult)
 
 
-def _leg(d, speed_mult=1.0):
+def _leg(d, speed_mult=1.0, walk=None):
     """Generalised time of walking an edge: time x hazard penalty, plus a fixed penalty for
-    crossing an exposed edge so waiting in a safe queue is preferred over walking through smoke."""
+    crossing an exposed edge so waiting in a safe queue is preferred over walking through smoke.
+    walk: a learned prediction of the walking time under current crowding (replaces free-flow time)."""
     h = d.get("hazard", 0.0)
     extra = C.HAZARD_DETOUR_PENALTY_S if h >= C.HAZARD_EXPOSURE else 0.0
-    return _walk_time(d, speed_mult) * _hazard_penalty(h) + extra
+    t = walk / speed_mult if walk is not None else _walk_time(d, speed_mult)
+    return t * _hazard_penalty(h) + extra
 
 
 def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0):
@@ -98,7 +108,7 @@ def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0):
             if not _allowed(d, fire_active, step_free):
                 continue
             te = res.entry_time(u, v, d, t)
-            tv = te + _leg(d, speed_mult)
+            tv = te + _leg(d, speed_mult, res.walk.get((u, v)))
             if tv < best.get(v, math.inf):
                 best[v] = tv
                 prev[v] = u
@@ -115,7 +125,7 @@ def path_cost(G, res, path, t0, fire_active=False, step_free=False, speed_mult=1
         d = G.edges[u, v]
         if not _allowed(d, fire_active, step_free):
             return math.inf
-        t = res.entry_time(u, v, d, t) + _leg(d, speed_mult)
+        t = res.entry_time(u, v, d, t) + _leg(d, speed_mult, res.walk.get((u, v)))
     return t
 
 
@@ -125,13 +135,13 @@ def book_path(G, res, path, t0, speed_mult=1.0):
         d = G.edges[u, v]
         te = res.entry_time(u, v, d, t)
         res.reserve(u, v, te)
-        t = te + _leg(d, speed_mult)
+        t = te + _leg(d, speed_mult, res.walk.get((u, v)))
     return t
 
 
-def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf):
+def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf, walk=None):
     """One-shot CCRP: plan agents in order of when they are ready to move."""
-    res = Reservations(G, now, horizon)
+    res = Reservations(G, now, horizon, walk)
     order = sorted(agents, key=lambda a: (a.start, a.id))
     out = {}
     for a in order:
@@ -144,7 +154,7 @@ def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf):
     return out
 
 
-def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain):
+def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, walk=None):
     """
     Rolling-horizon re-plan at time `now`.
       1. Book what is already committed: people walking an edge keep their remaining route.
@@ -153,7 +163,7 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain):
          never by stepping back to the node they just came from.
     Returns number of route changes.
     """
-    res = Reservations(G, now, horizon)
+    res = Reservations(G, now, horizon, walk)
     for a in moving:
         u, v = a.path[a.idx], a.path[a.idx + 1]
         d = G.edges[u, v]
@@ -163,7 +173,7 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain):
     # people who ignore guidance are not re-planned, but the planner sees where they are
     # heading and books their capacity first
     for a in standing:
-        if not getattr(a, "compliant", True):
+        if not getattr(a, "compliant", True) and C.PLANNER_BOOK_NONCOMPLIANT:
             book_path(G, res, a.path[a.idx:], max(a.start, now), a.speed_mult)
 
     changes = 0

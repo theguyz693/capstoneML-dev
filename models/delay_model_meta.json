@@ -1,0 +1,23 @@
+{
+  "features": [
+    "is_stair",
+    "is_room_door",
+    "is_exit_door",
+    "is_corridor",
+    "length_m",
+    "width_m",
+    "eff_cap",
+    "free_speed",
+    "hazard",
+    "queue_ahead",
+    "queue_at_node",
+    "on_edge",
+    "density",
+    "planned_users"
+  ],
+  "target": "target_time_s (seconds through edge incl. queue)",
+  "train_rows": 237405,
+  "train_scenarios": 160,
+  "cqr_correction_s": 3.0717233201471572e-09,
+  "alpha": 0.1
+}

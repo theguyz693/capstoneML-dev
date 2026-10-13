@@ -77,6 +77,10 @@ SWITCH_GAIN = 0.15            # switch route only if predicted >= 15% faster (an
 HAZARD_DETOUR_PENALTY_S = 300.0  # planner adds this per edge with hazard >= HAZARD_EXPOSURE, so it only
                                  # trades safety for speed when waiting would exceed ~5 min
 
+# Ablation switches (Session 6): turn one ingredient of the planner off to measure its contribution
+PLANNER_USE_SUSTAINABLE_CAP = True   # False: book nominal door/stair flow instead of what the edge can sustain
+PLANNER_BOOK_NONCOMPLIANT = True     # False: planner ignores where non-compliant people are heading
+
 # ---------------------------------------------------------------- behaviour (Session 4)
 # These are SWEPT in experiments, not claimed to be measured human behaviour.
 COMPLIANCE = 1.0              # share of people who follow the system's route

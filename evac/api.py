@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 router = APIRouter(prefix="/api/research", tags=["research"])
 _G = None
-ALLOWED = ("nearest", "safe_shortest", "reactive", "ccrp", "lookahead", "ml")
+ALLOWED = ("nearest", "safe_shortest", "reactive", "ccrp", "lookahead", "ml", "pred_formula", "pred_ml", "pred_ml_upper", "lookahead_ml")
 
 
 def G0():
