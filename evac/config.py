@@ -116,3 +116,13 @@ PROFILES = {
     "wheelchair": {"speed": 0.7, "step_free": True,  "size": 2.0, "pre_s": (20, 90)},
     "bed":        {"speed": 0.5, "step_free": True,  "size": 4.0, "pre_s": (60, 240)},  # bed pushed by staff
 }
+
+# ---------------------------------------------------------------- hospital procedures (Session 7)
+COMPARTMENT_LEAK = 0.15       # hazard reaching the next fire compartment through closed fire doors (light smoke)
+STAFF_PER_BED = 2             # staff needed to move one bed
+STAFF_WALK_SPEED = 1.25       # m/s, staff walking back for the next bed
+
+# ---------------------------------------------------------------- learned delay model version (Session 7)
+# v1 = trained on the campus only (Session 6, all reported campus results);
+# v2 = trained on campus + hospital, with ramp and mover (speed, size) features (evac/ml_transfer.py)
+DELAY_MODEL = "v1"

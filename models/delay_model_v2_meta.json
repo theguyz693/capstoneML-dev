@@ -1,0 +1,27 @@
+{
+ "features": [
+  "is_stair",
+  "is_room_door",
+  "is_exit_door",
+  "is_corridor",
+  "length_m",
+  "width_m",
+  "eff_cap",
+  "free_speed",
+  "hazard",
+  "queue_ahead",
+  "queue_at_node",
+  "on_edge",
+  "density",
+  "planned_users",
+  "is_ramp",
+  "mover_speed",
+  "mover_size"
+ ],
+ "train_rows": 248692,
+ "buildings": [
+  "campus",
+  "hospital"
+ ],
+ "target": "target_time_s (seconds through edge incl. queue)"
+}

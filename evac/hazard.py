@@ -45,13 +45,18 @@ def node_hazards(G, fires, t=None):
         c = G.nodes[src]
         fl = c["floor"]
 
-        # 1. same-floor radial spread
+        # 1. same-floor radial spread; a "contained" fire stays in its fire compartment (fire doors):
+        #    other compartments only get light smoke (COMPARTMENT_LEAK x, below the exposure threshold)
+        comp = c.get("compartment") if f.get("contained") else None
         for n, d in G.nodes(data=True):
             if d["floor"] != fl:
                 continue
             dist = math.hypot(d["x"] - c["x"], d["y"] - c["y"])
             if dist <= radius:
-                h[n] = max(h[n], inten * (1.0 - dist / radius))
+                v = inten * (1.0 - dist / radius)
+                if comp is not None and d.get("compartment") != comp:
+                    v *= C.COMPARTMENT_LEAK
+                h[n] = max(h[n], v)
 
         # 2. smoke rises through any stair shaft touched by the zone
         touched = {}

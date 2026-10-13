@@ -51,6 +51,21 @@ python -m evac.hospital_report         # -> docs/hospital_results.md, figures 18
 python tests/test_evac_hospital.py
 ```
 The dashboard has a building selector (campus / hospital) in the top bar.
+
+### Session 7: making it practical
+```bash
+python -m evac.session7            # printed plans, imperfect head-counts, hospital procedures (~15 min) -> docs/session7_results.md
+python -m evac.ml_transfer         # retrain the delay model on both buildings (~12 min) -> docs/ml_transfer.md, models/delay_lgbm_v2*
+python tests/test_evac_session7.py
+```
+- `fixed_plan.py`: a plan made ONCE from the expected occupancy (timetable / bed list), printable per room
+  (`docs/plans/`), method `fixed_plan` with scenario key `route_plan`.
+- `knowledge.py`: what the planner can see - `sense_miss` (people unseen), `sense_false` (phantom people),
+  `sense_dead_floor` (one floor's sensors down).
+- Hospital procedures (scenario keys): fires with `"contained": true` stay in their fire compartment;
+  `refuge` (move a compartment to a safe place in the building), `in_place` (defend in place), `staff`
+  (beds need 2 staff, who walk back for the next bed).
+- `config.DELAY_MODEL = "v2"` switches the learned planner to the two-building model.
 Hospital scenarios use `"spawn": "groups"` with occupant profiles (`config.PROFILES`: walk, slow, wheelchair,
 bed - speed, stairs allowed, capacity used, preparation time). New edge type `ramp` (step-free, usable in a fire).
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
@@ -79,6 +94,8 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `ga.py` | Genetic algorithm over exit assignments (fitness = full simulation). |
 | `final_experiments.py` / `final_report.py` | Final experiment matrix and the report generator. |
 | `hospital.py` | Imports the team's hospital drawings data (scale from the 54,675 mm dimension, floors aligned on shared shafts), loads it, hospital scenarios. |
+| `fixed_plan.py` / `knowledge.py` / `session7.py` | Printed plans, imperfect knowledge of where people are, hospital procedures (Session 7). |
+| `ml_transfer.py` | Transfer of the learned model between buildings; two-building model v2 (Session 7). |
 | `hospital_experiments.py` / `hospital_report.py` | Session 6 experiments on the hospital + patient groups, ramp weak spot, hospital assumptions. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 

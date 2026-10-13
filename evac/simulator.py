@@ -222,7 +222,8 @@ def run(G, scenario, method, seed):
     edge_rows = []
 
     # routes: one multi-source Dijkstra per (method, step_free) covers every origin
-    base = "safe_shortest" if method in ("reactive", "ccrp", "lookahead", "lookahead_ml") or method.startswith("pred_") else method
+    base = ("safe_shortest" if method in ("reactive", "ccrp", "lookahead", "lookahead_ml", "fixed_plan")
+            or method.startswith("pred_") else method)
     if method == "lookahead_ml":
         edge_index = learned_planner.EdgeIndex(G)
     if method.startswith("pred_"):
@@ -254,6 +255,9 @@ def run(G, scenario, method, seed):
             if p:
                 a.path, a.exit = p, p[-1]
 
+    # hospital procedures (Session 7): defend in place, move to a refuge, limited staff for beds
+    _hospital_procedures(G, scenario, agents, fire_active)
+
     # optional fixed exit assignment per origin room (used by the genetic-algorithm baseline)
     exit_plan = scenario.get("exit_plan")
     if exit_plan:
@@ -269,16 +273,25 @@ def run(G, scenario, method, seed):
             if p:
                 a.path, a.exit = p, p[-1]
 
+    # printed plan made without live data (Session 7, evac/fixed_plan.py)
+    if method == "fixed_plan":
+        from .fixed_plan import assign
+        assign(G, agents, scenario["route_plan"], scenario.get("route_plan_mode", "split"), fire_active)
+
+    # what the planner can see of the crowd (Session 7, evac/knowledge.py)
+    from .knowledge import Sensor
+    sensor = Sensor(scenario, seed, G)
+
     horizon = float(scenario.get("horizon_s", C.HORIZON_S))
     switch_gain = float(scenario.get("switch_gain", C.SWITCH_GAIN))
     if method in ("ccrp", "lookahead", "lookahead_ml"):
-        plannable = [a for a in agents if a.path is not None and a.compliant]
+        plannable = sensor.sense([a for a in agents if a.path is not None and a.compliant])
         walk0 = (learned_planner.walk_predictions(G, edge_index, agents, {}, {})
                  if method == "lookahead_ml" else None)
         plans = planner.plan_all(G, plannable, fire_active,
                                  horizon=math.inf if method == "ccrp" else horizon, walk=walk0)
         for a in plannable:
-            if a.id in plans:
+            if a.id in plans and a.id >= 0:          # negative ids are phantom (sensed but not real) people
                 a.path = plans[a.id]
                 a.exit = a.path[-1]
 
@@ -318,7 +331,8 @@ def run(G, scenario, method, seed):
                 "eff_cap": round(d["eff_cap"], 3), "free_speed": d["free_speed"],
                 "hazard": d.get("hazard", 0.0), "queue_ahead": ahead, "queue_at_node": len(queues[node]) - 1,
                 "on_edge": occ[k], "density": round(occ[k] / (d["length_m"] * d["width_m"]), 3),
-                "planned_users": planned, "_t_join": now,
+                "planned_users": planned, "mover_speed": round(a.speed_mult, 3), "mover_size": a.size,
+                "_t_join": now,
             }
 
     trace_key = tuple(sorted(scenario["trace_edge"])) if scenario.get("trace_edge") else None
@@ -335,7 +349,7 @@ def run(G, scenario, method, seed):
     def snapshot(now):
         pts = []
         for a in agents:
-            if a.state in ("evacuated", "needs_assistance", "stranded") or a.path is None:
+            if a.state in ("evacuated", "needs_assistance", "stranded", "in_place") or a.path is None:
                 continue
             if a.state == "moving":
                 u, v = a.path[a.idx], a.path[a.idx + 1]
@@ -369,7 +383,8 @@ def run(G, scenario, method, seed):
             standing = [a for q in queues.values() for a in q] + list(active)
             walk = (learned_planner.walk_predictions(G, edge_index, agents, queues, occ)
                     if method == "lookahead_ml" else None)
-            planner.replan(G, agents, moving, standing, t, fire_active, horizon, switch_gain, walk=walk)
+            planner.replan(G, agents, sensor.sense(moving), sensor.sense(standing), t, fire_active, horizon,
+                           switch_gain, walk=walk)
         # flow budgets refill
         for u, v, d in G.edges(data=True):
             k = _ekey(u, v)
@@ -479,7 +494,8 @@ def run(G, scenario, method, seed):
         "needs_assistance": sum(a.state == "needs_assistance" for a in agents),
         "stranded": sum(a.state == "stranded" for a in agents),
         "timed_out": sum(a.state in ("queued", "moving", "waiting") for a in agents),
-        "exposed_agents": sum(a.exposed for a in agents),
+        "exposed_agents": sum(a.exposed for a in agents) + _in_place_exposed(G, scenario, agents, t),
+        "in_place": sum(a.state == "in_place" for a in agents),
         "max_hazard_crossed": round(max((a.max_hazard for a in agents), default=0.0), 3),
         "max_queue": max_queue,
         "max_queue_node": max_queue_node,
@@ -501,6 +517,82 @@ def run(G, scenario, method, seed):
         for a in agents
     ]
     return metrics, records
+
+
+def _hospital_procedures(G, scenario, agents, fire_active):
+    """Scenario keys (all optional):
+      "in_place": "<regex>" | "rest"            people in matching rooms (or everyone not sent to a refuge)
+                                                stay put (defend in place)
+      "refuge": [{"where": "<regex>" | "compartment": "<label>", "target": "<node>"}]
+                                                people in matching rooms go to a safe place inside the
+                                                building (e.g. the next fire compartment) instead of an exit
+      "staff": {"<floor>": n}                   beds on that floor can only move when a team of
+                                                STAFF_PER_BED staff is free; teams walk back for the next bed
+    """
+    import re
+    moved = set()
+    for r in scenario.get("refuge", []):
+        rx = re.compile(r["where"]) if r.get("where") else None
+        tabs = {}
+        for a in agents:
+            if a.state != "waiting":
+                continue
+            if rx is not None and not rx.search(a.origin):
+                continue
+            if r.get("compartment") and G.nodes[a.origin].get("compartment") != r["compartment"]:
+                continue
+            moved.add(a.id)
+            if a.step_free not in tabs:
+                tabs[a.step_free] = route_table(G, "safe_shortest", fire_active, a.step_free, targets=[r["target"]])
+            p = tabs[a.step_free].get(a.origin)
+            if p:
+                a.path, a.exit = p, p[-1]
+    stay = scenario.get("in_place")
+    if stay:                      # a regex, or "rest" = everyone not sent to a refuge
+        rx = None if stay == "rest" else re.compile(stay)
+        for a in agents:
+            if a.state == "waiting" and a.id not in moved and (rx is None or rx.search(a.origin)):
+                a.state = "in_place"
+    staff = scenario.get("staff")
+    if staff:
+        fires = scenario.get("fires", [])
+        fire_comp = {G.nodes[f["node"]].get("compartment") for f in fires if f.get("node") in G}
+
+        def length(path):
+            return sum(G.edges[u, v]["length_m"] for u, v in zip(path, path[1:]))
+        for fl, n_staff in staff.items():
+            teams = [0.0] * max(1, int(n_staff) // C.STAFF_PER_BED)
+            beds = [a for a in agents if a.profile == "bed" and a.state == "waiting" and a.path
+                    and G.nodes[a.origin]["floor"] == int(fl)]
+            # beds in the fire compartment first, then in order of readiness
+            beds.sort(key=lambda a: (G.nodes[a.origin].get("compartment") not in fire_comp, a.start, a.id))
+            for a in beds:
+                k = min(range(len(teams)), key=lambda i: teams[i])
+                a.start = max(a.start, teams[k])
+                L = length(a.path)
+                trip = sum(G.edges[u, v]["length_m"] / (G.edges[u, v]["free_speed"] * a.speed_mult)
+                           for u, v in zip(a.path, a.path[1:]))
+                teams[k] = a.start + trip + L / C.STAFF_WALK_SPEED
+
+
+def _in_place_exposed(G, scenario, agents, t_end):
+    """People defending in place are exposed if smoke/fire reaches their room while they wait."""
+    stay = [a for a in agents if a.state == "in_place"]
+    if not stay:
+        return 0
+    from .hazard import node_hazards
+    fires = scenario.get("fires", [])
+    times = [None] if not is_dynamic(fires) else [k * 10.0 for k in range(int(max(t_end, 600) // 10) + 1)]
+    worst = defaultdict(float)
+    for tt in times:
+        for n, h in node_hazards(G, fires, tt).items():
+            worst[n] = max(worst[n], h)
+    n_exp = 0
+    for a in stay:
+        if worst[a.origin] >= C.HAZARD_EXPOSURE:
+            a.exposed = True
+            n_exp += 1
+    return n_exp
 
 
 def _optimum(G, scenario, seed):

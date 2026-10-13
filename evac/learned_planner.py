@@ -40,14 +40,19 @@ ET = ("stair", "room_door", "exit_door", "corridor")
 
 
 def _load(kind):
-    if kind not in _models:
+    """kind: 'ml' or 'ml_upper'; config.DELAY_MODEL picks the version (v1 = campus-trained, Session 6;
+    v2 = trained on both buildings with ramp + mover features, Session 7)."""
+    ver = getattr(C, "DELAY_MODEL", "v1")
+    key = (kind, ver)
+    if key not in _models:
         import joblib
-        name = {"ml": "delay_lgbm.joblib", "ml_upper": "delay_lgbm_q95.joblib"}[kind]
+        suffix = "" if ver == "v1" else f"_{ver}"
+        name = {"ml": f"delay_lgbm{suffix}.joblib", "ml_upper": f"delay_lgbm{suffix}_q95.joblib"}[kind]
         path = os.path.join(MODELDIR, name)
         if not os.path.exists(path):
-            raise FileNotFoundError(f"{path} missing - run: python -m evac.ml_study")
-        _models[kind] = joblib.load(path)
-    return _models[kind]
+            raise FileNotFoundError(f"{path} missing - run: python -m evac.ml_study (v1) / python -m evac.ml_transfer (v2)")
+        _models[key] = joblib.load(path)
+    return _models[key]
 
 
 class EdgeIndex:
@@ -57,14 +62,21 @@ class EdgeIndex:
         self.edges = [(u, v) for u, v in G.edges()] + [(v, u) for u, v in G.edges()]
         self.pos = {e: i for i, e in enumerate(self.edges)}
         n = len(self.edges)
-        self.static = np.zeros((n, 8))
+        self.static = np.zeros((n, 9))
         for i, (u, v) in enumerate(self.edges):
             d = G.edges[u, v]
-            self.static[i, :4] = [d["etype"] == et for et in ET]
-            self.static[i, 4:] = [d["length_m"], d["width_m"], d["eff_cap"], d["free_speed"]]
+            self.static[i, :5] = [d["etype"] == et for et in ET + ("ramp",)]
+            self.static[i, 5:] = [d["length_m"], d["width_m"], d["eff_cap"], d["free_speed"]]
+
+
+COLS = ["is_stair", "is_room_door", "is_exit_door", "is_corridor", "is_ramp", "length_m", "width_m", "eff_cap",
+        "free_speed", "hazard", "queue_ahead", "queue_at_node", "on_edge", "density", "planned_users",
+        "mover_speed", "mover_size"]
 
 
 def _features(G, idx, queues, occ, planned):
+    """One row per directed edge; every column any model version may use (named, see COLS)."""
+    import pandas as pd
     n = len(idx.edges)
     dyn = np.zeros((n, 6))
     qa = defaultdict(int)
@@ -77,19 +89,17 @@ def _features(G, idx, queues, occ, planned):
         k = (u, v) if u <= v else (v, u)
         dyn[i] = [d.get("hazard", 0.0), qa.get((u, v), 0), len(queues.get(u, ())), occ.get(k, 0),
                   occ.get(k, 0) / (d["length_m"] * d["width_m"]), planned.get((u, v), 0)]
-    # column order must match delay_model.FEATURES
-    return np.hstack([idx.static, dyn])
+    mover = np.ones((n, 2))            # predictions are for a standard person (speed x1, size 1)
+    return pd.DataFrame(np.hstack([idx.static, dyn, mover]), columns=COLS)
 
 
 def _predict(kind, X):
     if kind == "formula":
-        length, width, cap, speed = X[:, 4], X[:, 5], X[:, 6], X[:, 7]
-        dens = X[:, 12]
-        f = np.array([weidmann_speed_factor(x) for x in dens])
-        return X[:, 9] / cap + length / (speed * f)
-    import pandas as pd
-    from .delay_model import FEATURES
-    return np.maximum(0.1, _load(kind).predict(pd.DataFrame(X, columns=FEATURES)))
+        f = np.array([weidmann_speed_factor(x) for x in X["density"]])
+        return (X["queue_ahead"] / X["eff_cap"] + X["length_m"] / (X["free_speed"] * f)).to_numpy()
+    m = _load(kind)
+    cols = list(getattr(m, "feature_name_", None) or __import__("evac.delay_model", fromlist=["FEATURES"]).FEATURES)
+    return np.maximum(0.1, m.predict(X[cols]))
 
 
 def _planned(agents):
@@ -170,7 +180,7 @@ def walk_predictions(G, idx, agents, queues, occ):
     model with the queue features set to zero, because capacity booking already handles queues.
     What remains is the slowdown from crowding on the edge and from people planning to use it."""
     X = _features(G, idx, queues, occ, _planned(agents))
-    X[:, 9] = 0.0      # queue_ahead
-    X[:, 10] = 0.0     # queue_at_node
+    X["queue_ahead"] = 0.0
+    X["queue_at_node"] = 0.0
     p = _predict("ml", X)
     return {e: float(p[i]) for i, e in enumerate(idx.edges)}

@@ -135,6 +135,15 @@ def load_hospital(path=DATA):
     nodes = {n: (x * u, y * u, fl) for n, (x, y, fl) in doc["nodes"].items()}
     G = build_graph(nodes, [tuple(e) for e in doc["edges"]], floor_height=350, kinds=doc["kinds"])
     G.graph["name"] = "hospital"
+    # Fire compartments (Session 7): each floor is split into a West and an East compartment at the
+    # bed-lift core, where the 3500 mm corridor has fire doors in a typical hospital layout. ASSUMPTION -
+    # the drawings do not mark fire doors. Used only by fires marked "contained": true.
+    for fl in range(4):
+        pre = "g" if fl == 0 else f"f{fl}"
+        core = G.nodes[f"{pre}_bed lift 1"]["x"]
+        for n, d in G.nodes(data=True):
+            if d["floor"] == fl:
+                d["compartment"] = f"{pre}-{'W' if d['x'] < core else 'E'}"
     return G
 
 

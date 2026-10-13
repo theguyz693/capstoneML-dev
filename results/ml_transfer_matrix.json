@@ -1,0 +1,114 @@
+[
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "-",
+  "model": "queueing formula (no training)",
+  "MAE all": 2.9030924659375223,
+  "MAE crowded": 9.315260200508972,
+  "MAE slow movers": 3.3623709296669784
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "campus only",
+  "model": "LightGBM, v1 features",
+  "MAE all": 1.9422995435805117,
+  "MAE crowded": 5.340046587073983,
+  "MAE slow movers": 2.4287314319782696
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "campus only",
+  "model": "LightGBM, v2 features",
+  "MAE all": 1.4683721307052022,
+  "MAE crowded": 4.830120181144152,
+  "MAE slow movers": 1.6310379440972023
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "hospital only",
+  "model": "LightGBM, v1 features",
+  "MAE all": 8.222120890455821,
+  "MAE crowded": 25.206119661056476,
+  "MAE slow movers": 7.647849637892935
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "hospital only",
+  "model": "LightGBM, v2 features",
+  "MAE all": 4.96720251152821,
+  "MAE crowded": 18.598417314274105,
+  "MAE slow movers": 5.195121684750372
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "both buildings",
+  "model": "LightGBM, v1 features",
+  "MAE all": 2.39852869619109,
+  "MAE crowded": 6.327893928016094,
+  "MAE slow movers": 2.488637790501077
+ },
+ {
+  "test": "campus (held-out evacuations)",
+  "trained on": "both buildings",
+  "model": "LightGBM, v2 features",
+  "MAE all": 1.5534381560528372,
+  "MAE crowded": 5.057849307471993,
+  "MAE slow movers": 1.791527127878432
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "-",
+  "model": "queueing formula (no training)",
+  "MAE all": 5.033588567272842,
+  "MAE crowded": 21.053225275849798,
+  "MAE slow movers": 5.766484802710793
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "campus only",
+  "model": "LightGBM, v1 features",
+  "MAE all": 8.523298237480402,
+  "MAE crowded": 24.71038025269648,
+  "MAE slow movers": 10.406742440714687
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "campus only",
+  "model": "LightGBM, v2 features",
+  "MAE all": 7.808110245609877,
+  "MAE crowded": 24.34553759693087,
+  "MAE slow movers": 9.584806035161035
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "hospital only",
+  "model": "LightGBM, v1 features",
+  "MAE all": 4.409101009117038,
+  "MAE crowded": 13.317036399249744,
+  "MAE slow movers": 4.455823661215527
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "hospital only",
+  "model": "LightGBM, v2 features",
+  "MAE all": 2.826004782487078,
+  "MAE crowded": 10.98167621658186,
+  "MAE slow movers": 3.1827030244986236
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "both buildings",
+  "model": "LightGBM, v1 features",
+  "MAE all": 4.449156733262035,
+  "MAE crowded": 13.198599199521265,
+  "MAE slow movers": 4.727061517988455
+ },
+ {
+  "test": "hospital (held-out evacuations)",
+  "trained on": "both buildings",
+  "model": "LightGBM, v2 features",
+  "MAE all": 2.874559598559954,
+  "MAE crowded": 10.998396095867436,
+  "MAE slow movers": 3.2339675183702594
+ }
+]
