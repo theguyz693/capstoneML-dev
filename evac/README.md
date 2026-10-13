@@ -73,6 +73,15 @@ python -m evac.validation                       # vs lab door flows, NIST stair 
 python -m evac.validation --drill data/field_drills.csv   # after a timed real drill (docs/field_validation_protocol.md)
 python tests/test_evac_session8.py
 ```
+### Session 9: published baselines and a JuPedSim cross-check
+```bash
+python -m evac.literature_experiments           # quickest path + CASPER, 30 paired seeds, both buildings -> docs/literature_baselines.md
+pip install jupedsim shapely                     # only needed for the cross-check
+python -m evac.jupedsim_check                    # same geometry + people in JuPedSim (CFSM, AVM, SFM) -> docs/jupedsim_crosscheck.md
+python tests/test_evac_literature.py
+```
+New methods for `run()`: `quickest` (Kemloh Wagoum, Seyfried & Holl 2012) and `casper` (Shahabi & Wilson 2014).
+
 Dashboard **What-if** tab (`/api/research/whatif`): take stairwells / the ramp / exit doors out of service, change
 the number of people, add a fire - compare with the normal building (shortest path vs look-ahead), with queue hot-spots.
 Hospital scenarios use `"spawn": "groups"` with occupant profiles (`config.PROFILES`: walk, slow, wheelchair,
@@ -107,6 +116,8 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `validation.py` | Validation against published measurements, IMO MSC.1/Circ.1533 tests, field-drill comparison (Session 8). |
 | `ml_transfer.py` | Transfer of the learned model between buildings; two-building model v2 (Session 7). |
 | `hospital_experiments.py` / `hospital_report.py` | Session 6 experiments on the hospital + patient groups, ramp weak spot, hospital assumptions. |
+| `literature.py` / `literature_experiments.py` | Published baselines: quickest-path route choice and CASPER, and their experiment (Session 9). |
+| `jupedsim_check.py` | Cross-check of the simulator against JuPedSim on the same geometry and people (Session 9). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

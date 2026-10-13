@@ -222,7 +222,8 @@ def run(G, scenario, method, seed):
     edge_rows = []
 
     # routes: one multi-source Dijkstra per (method, step_free) covers every origin
-    base = ("safe_shortest" if method in ("reactive", "ccrp", "lookahead", "lookahead_ml", "fixed_plan")
+    base = ("safe_shortest" if method in ("reactive", "ccrp", "lookahead", "lookahead_ml", "fixed_plan",
+                                          "quickest", "casper")
             or method.startswith("pred_") else method)
     if method == "lookahead_ml":
         edge_index = learned_planner.EdgeIndex(G)
@@ -295,6 +296,18 @@ def run(G, scenario, method, seed):
                 a.path = plans[a.id]
                 a.exit = a.path[-1]
 
+    # published baselines (evac/literature.py)
+    qp = None
+    if method == "casper":
+        from .literature import casper_plan
+        plannable = [a for a in sensor.sense([a for a in agents if a.path is not None and a.compliant]) if a.id >= 0]
+        for aid, p in casper_plan(G, plannable, fire_active).items():
+            ag = agents[aid]
+            ag.path, ag.exit = p, p[-1]
+    elif method == "quickest":
+        from .literature import QuickestPath
+        qp = QuickestPath(G, fire_active)
+
     budget = defaultdict(float)
     occ = defaultdict(int)
     queues = defaultdict(list)      # node -> agents waiting to leave it
@@ -317,6 +330,8 @@ def run(G, scenario, method, seed):
                     a.path = a.path[:a.idx] + p
                     a.exit = top
                     a.changes += 1
+        if qp is not None:
+            qp.on_arrival(a, now, queues, occ)
         queues[node].append(a)
         if log_edges and a.idx < len(a.path) - 1:
             u, v = a.path[a.idx], a.path[a.idx + 1]
@@ -376,6 +391,9 @@ def run(G, scenario, method, seed):
         if method == "reactive" and t >= next_reroute:
             next_reroute += C.REROUTE_INTERVAL_S
             _reactive_reroute(G, fire_active, queues, occ, [a for a in active if a.compliant])
+        elif method == "quickest" and t >= next_reroute:
+            next_reroute += 1.0
+            qp.jam_check(t, queues, occ)
         elif method.startswith("pred_") and t >= next_reroute:
             next_reroute += C.REPLAN_S
             learned_planner.replan(G, edge_index, pred_kind, agents, queues, occ, active, fire_active, switch_gain)

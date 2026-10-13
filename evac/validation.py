@@ -280,7 +280,11 @@ def main(argv=None):
         f"**Door flow is conservative.** The simulator passes {C.SPECIFIC_FLOW['exit_door']} persons/s per metre "
         f"(the SFPE engineering value, which the IMO test caps at 1.33): {lo:.0%}-{hi:.0%} of the flow measured in "
         "laboratory bottleneck experiments with young adults (Seyfried et al. 2009). Real crowds can push more people "
-        "through a door, so our evacuation times err on the long (safe) side.",
+        "through a door, so our evacuation times err on the long (safe) side. (Session 9 correction: this is the rate "
+        "people are let onto the door edge. The rate they actually leave through a crowded 1 m door is lower, about "
+        "0.8 persons/s, because walking speed on the edge falls with density - about half the laboratory value and "
+        "inside the range of the JuPedSim models; see docs/jupedsim_crosscheck.md. Times are therefore even more "
+        "conservative than stated here.)",
         f"**Stair speed matches real drills.** Across all simulated stair crossings the mean speed is "
         f"{s_all[0]:.2f} +- {s_all[1]:.2f} m/s; NIST measured {NIST_STAIRS['all 4 buildings'][0]} +- "
         f"{NIST_STAIRS['all 4 buildings'][1]} m/s in fire drills in four office buildings (about 3,000 evacuees analysed). Uncrowded, "
