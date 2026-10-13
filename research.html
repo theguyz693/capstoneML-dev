@@ -57,6 +57,15 @@
   .kiosk .msg { font-size: 18px; margin-top: 10px; }
   .kiosk .where { color: var(--muted); font-size: 12px; margin-top: 6px; }
   .hidden { display: none !important; }
+  .findings { margin: 0; padding-left: 22px; }
+  .findings li { margin: 7px 0; }
+  .findings b { color: var(--cyan); }
+  .figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 14px; margin-top: 14px; align-items: start; }
+  .fig { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .fig .hd { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .fig .hd b { font-size: 14px; } .fig .hd div { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .fig img { width: 100%; display: block; background: #fff; }
+  @media (max-width: 600px) { .figs { grid-template-columns: 1fr; } }
   @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -64,12 +73,14 @@
 <header>
   <h1>Evacuation Research Lab</h1>
   <span class="sub">Same people, same fire - different routing methods, side by side</span>
-  <a href="/">← 3D dashboard</a>
+  <select id="bld" style="width:auto;margin-left:auto"><option value="campus">Campus main block (G+6)</option><option value="hospital">Oncology hospital (G+3)</option></select>
+  <a href="/" style="margin-left:14px">← 3D dashboard</a>
 </header>
 <div class="tabs">
   <div class="tab on" data-tab="race">Method race</div>
   <div class="tab" data-tab="signs">Kiosk signs</div>
   <div class="tab" data-tab="weak">Weak spots</div>
+  <div class="tab" data-tab="results">Results</div>
 </div>
 
 <!-- ===================== METHOD RACE ===================== -->
@@ -108,6 +119,7 @@
         <span><i style="background:var(--red)"></i>fire / smoke</span>
         <span><i style="background:var(--green)"></i>exit</span>
         <span><i style="background:var(--violet)"></i>stairs</span>
+        <span><i style="background:var(--amber);border-radius:0"></i>ramp (hospital)</span>
       </div>
     </div>
     <div class="panels" id="panels"></div>
@@ -151,7 +163,8 @@
     <div class="desc" id="wDesc">Blocks one stair flight / exit door / key corridor at a time and re-runs the same evacuation.</div>
     <label>Floor</label>
     <div class="fl" id="wFloorBtns"></div>
-    <div class="desc" style="margin-top:12px">Highlighted on the plan: the top 5 elements. Regenerate with <code>python -m evac.weakspots</code>.</div>
+    <div class="desc" style="margin-top:12px">Highlighted on the plan: the top 5 elements. Regenerate with <code>python -m evac.weakspots</code> (campus) or
+      <code>python -m evac.hospital_experiments --parts W</code> (hospital). "Last out" counts only people who get out.</div>
   </div>
   <div class="main">
     <div class="mp"><canvas id="weakCanvas" height="520"></canvas></div>
@@ -159,11 +172,25 @@
   </div>
 </div>
 
+<!-- ===================== RESULTS ===================== -->
+<div class="hidden" id="tab-results" style="padding:14px 18px">
+  <div class="card">
+    <h3>Key findings</h3>
+    <div class="desc" style="margin-bottom:8px" id="resDesc"></div>
+    <ol id="findings" class="findings"></ol>
+  </div>
+  <div class="figs" id="figs"></div>
+</div>
+
 <script>
 const API = "/api/research";
+let BLD = "campus";
+const q = () => `?building=${BLD}`;
 const LABEL = { nearest: "Nearest exit", safe_shortest: "Shortest safe path", reactive: "Reactive rerouting",
-  ccrp: "Capacity booking", lookahead: "Look-ahead re-planning", ml: "Old ML edge cost" };
-const LINE = { nearest: "#94a3b8", safe_shortest: "#64748b", reactive: "#f59e0b", ccrp: "#a78bfa", lookahead: "#22d3ee", ml: "#f472b6" };
+  ccrp: "Capacity booking", lookahead: "Look-ahead re-planning", lookahead_ml: "Look-ahead + ML walk times",
+  pred_formula: "Re-route on queue formula", pred_ml: "Re-route on ML prediction", ml: "Old ML edge cost" };
+const LINE = { nearest: "#94a3b8", safe_shortest: "#64748b", reactive: "#f59e0b", ccrp: "#a78bfa", lookahead: "#22d3ee",
+  lookahead_ml: "#7dd3fc", pred_formula: "#fbbf24", pred_ml: "#fb7185", ml: "#f472b6" };
 const DEFAULT_METHODS = ["safe_shortest", "reactive", "lookahead"];
 const FLOOR_H = 350;
 let B = null, scen = {}, result = null, frameIdx = 0, playing = false, floor = 3, timer = null;
@@ -215,6 +242,7 @@ function drawPlan(view, fl, hazard, opts = {}) {
     const hl = opts.highlightNode && opts.highlightNode[n.id];
     if (n.kind === "exit") { ctx.fillStyle = "#10b981"; ctx.fillRect(x - 5, y - 5, 10, 10); }
     else if (n.kind === "stair") { ctx.fillStyle = hl || "#a78bfa"; ctx.fillRect(x - (hl ? 6 : 4), y - (hl ? 6 : 4), hl ? 12 : 8, hl ? 12 : 8); }
+    else if (n.kind === "ramp") { ctx.fillStyle = hl || "#f59e0b"; const r = hl ? 7 : 5; ctx.beginPath(); ctx.moveTo(x - r, y + r); ctx.lineTo(x + r, y + r); ctx.lineTo(x + r, y - r); ctx.closePath(); ctx.fill(); }
     else if (n.kind === "lift") { ctx.strokeStyle = "#475569"; ctx.strokeRect(x - 3, y - 3, 6, 6); }
     else { ctx.fillStyle = n.kind === "room" ? "#334155" : "#3b4a6b"; ctx.beginPath(); ctx.arc(x, y, n.kind === "room" ? 2 : 1.6, 0, 7); ctx.fill(); }
   }
@@ -243,9 +271,9 @@ function drawFrame() {
     tShown = Math.max(tShown, fr.t);
     drawPlan(views[m], floor, fr.hazard || result.static_hazard);
     const { ctx, P } = views[m];
-    const perFloor = [0, 0, 0, 0, 0, 0, 0];
+    const perFloor = new Array(B.floors || 7).fill(0);
     for (const [id, x, y, z, st, comp] of fr.pts) {
-      const f = floorOf(z); perFloor[Math.max(0, Math.min(6, f))]++;
+      const f = floorOf(z); perFloor[Math.max(0, Math.min(perFloor.length - 1, f))]++;
       if (f !== floor) continue;
       // spread people standing in a queue into a blob so a jam is visible (queued = state 1)
       const r = st === 1 ? 14 + 4 * Math.sqrt(id % 40) : 8, ang = id * 2.399963;
@@ -313,14 +341,14 @@ function curve() {
 async function runRace() {
   const methods = [...document.querySelectorAll("#methods input:checked")].map(i => i.value);
   if (!methods.length) { $("status").textContent = "Pick at least one method."; return; }
-  const body = { scenario: $("scen").value, methods, seed: Number($("seed").value), compliance: Number($("comp").value) };
+  const body = { building: BLD, scenario: $("scen").value, methods, seed: Number($("seed").value), compliance: Number($("comp").value) };
   if ($("herd").value !== "") body.herding = Number($("herd").value);
   const f = $("fire").value;
-  if (f === "__none") { body.fire_node = null; }
+  if (f === "__none") { body.fire_node = null; body.no_fire = true; }
   else if (f) { body.fire_node = f; body.fire_radius = 500; }
   if ($("spread").checked) {
     body.fire_spreading = true;
-    body.fire_node = body.fire_node || (scen[$("scen").value].fires[0] || {}).node || "j19";
+    body.fire_node = body.fire_node || ((scen[$("scen").value].fires || [])[0] || {}).node || (BLD === "hospital" ? "f2_j6" : "j19");
   }
   $("runBtn").disabled = true; $("status").textContent = "Simulating… (a few seconds per method)";
   if (playing) play();
@@ -337,7 +365,7 @@ async function runRace() {
 }
 
 function floorButtons(el, cb, initial) {
-  el.innerHTML = [0, 1, 2, 3, 4, 5, 6].map(f => `<button data-f="${f}" class="${f === initial ? "on" : ""}">${f ? "F" + f : "G"}</button>`).join("");
+  el.innerHTML = [...Array(B.floors || 7).keys()].map(f => `<button data-f="${f}" class="${f === initial ? "on" : ""}">${f ? "F" + f : "G"}</button>`).join("");
   el.onclick = e => {
     const f = e.target.dataset.f; if (f === undefined) return;
     [...el.children].forEach(b => b.classList.toggle("on", b.dataset.f === f)); cb(Number(f));
@@ -347,7 +375,7 @@ function floorButtons(el, cb, initial) {
 // ------------------------------------------------ kiosk signs
 let sFloor = 0, signs = null, sView = null;
 async function loadSigns(kioskNode) {
-  const body = { fire_node: $("sFire").value || null, fire_radius: Number($("sRad").value), step_free: $("sStep").checked, kiosk_node: kioskNode || null };
+  const body = { building: BLD, fire_node: $("sFire").value || null, fire_radius: Number($("sRad").value), step_free: $("sStep").checked, kiosk_node: kioskNode || null };
   const res = await fetch(`${API}/signs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   signs = await res.json(); drawSigns();
   if (signs.kiosk) showKiosk(signs.kiosk);
@@ -400,12 +428,12 @@ $("signCanvas").addEventListener("click", e => {
 // ------------------------------------------------ weak spots
 let wFloor = 0, weak = null;
 async function loadWeak() {
-  const res = await fetch(`${API}/weakspots`);
+  const res = await fetch(`${API}/weakspots${q()}`);
   if (!res.ok) { $("wDesc").textContent = "No weak-spot results yet. Run: python -m evac.weakspots"; return; }
   weak = await res.json();
   $("wDesc").textContent = `Scenario ${weak.scenario}, method ${weak.method}. Baseline: last person out at ${weak.baseline_last_out_s}s.`;
   $("weakTable").innerHTML = `<tr><th>#</th><th>Blocked element</th><th>Last out</th><th>Average person</th><th>Cut off</th></tr>` +
-    weak.rows.slice(0, 15).map((r, i) => `<tr><td>${i + 1}</td><td>${r.element}</td><td>${r.last_out_delta_s == null ? "-" : "+" + r.last_out_delta_s + " s"}</td>
+    weak.rows.slice(0, 15).map((r, i) => `<tr><td>${i + 1}</td><td>${r.element}</td><td>${r.last_out_delta_s == null ? "-" : (r.last_out_delta_s >= 0 ? "+" : "") + r.last_out_delta_s + " s"}</td>
       <td>${r.mean_delta_s == null ? "-" : (r.mean_delta_s >= 0 ? "+" : "") + r.mean_delta_s + " s"}</td><td>${r.people_cut_off}</td></tr>`).join("");
   drawWeak();
 }
@@ -419,33 +447,66 @@ function drawWeak() {
 // ------------------------------------------------ init
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
-  for (const k of ["race", "signs", "weak"]) $(`tab-${k}`).classList.toggle("hidden", t.dataset.tab !== k);
+  for (const k of ["race", "signs", "weak", "results"]) $(`tab-${k}`).classList.toggle("hidden", t.dataset.tab !== k);
+  if (t.dataset.tab === "results" && !resultsLoaded) loadResults();
   if (t.dataset.tab === "signs" && !signs) loadSigns();
   if (t.dataset.tab === "weak" && !weak) loadWeak();
   if (t.dataset.tab === "race" && result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); }
 });
 
-(async function init() {
-  B = await (await fetch(`${API}/building`)).json(); NB = nodeById(); computeBounds();
-  scen = await (await fetch(`${API}/scenarios`)).json();
-  $("scen").innerHTML = Object.keys(scen).map(k => `<option ${k === "floor3_full_200" ? "selected" : ""}>${k}</option>`).join("");
-  const showDesc = () => $("scenDesc").textContent = scen[$("scen").value].description || "";
+// ------------------------------------------------ results
+let resultsLoaded = false;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+async function loadResults() {
+  resultsLoaded = true;
+  const r = await (await fetch(`${API}/results${q()}`)).json();
+  $("resDesc").innerHTML = `Seeded simulation runs, 30 paired seeds per scenario, 95% CIs, Holm-corrected Wilcoxon tests. Full tables: <code>docs/${BLD === "hospital" ? "hospital_results.md" : "final_results.md"}</code>.`;
+  $("findings").innerHTML = r.findings.length
+    ? r.findings.map(f => `<li>${esc(f).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</li>`).join("")
+    : "<li>No results yet - run <code>python -m evac.final_experiments</code> then <code>python -m evac.final_report</code>.</li>";
+  $("figs").innerHTML = r.figures.map(f => `<div class="fig"><div class="hd"><b>${esc(f.title)}</b><div>${esc(f.note)}</div></div>
+    <img loading="lazy" alt="${esc(f.title)}" src="${API}/figure/${f.file}"></div>`).join("");
+}
+
+async function loadBuilding() {
+  B = await (await fetch(`${API}/building${q()}`)).json(); NB = nodeById(); computeBounds();
+  scen = await (await fetch(`${API}/scenarios${q()}`)).json();
+  const first = BLD === "hospital" ? "hosp_day_peak" : "floor3_full_200";
+  $("scen").innerHTML = Object.keys(scen).map(k => `<option ${k === first ? "selected" : ""}>${k}</option>`).join("");
+  const showDesc = () => {
+    const s = scen[$("scen").value];
+    $("scenDesc").textContent = s.description || "";
+    $("comp").value = s.compliance ?? 1; $("compV").textContent = Math.round($("comp").value * 100) + "%";
+  };
   $("scen").onchange = showDesc; showDesc();
+  const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
+  $("fire").innerHTML = `<option value="">scenario default</option><option value="__none">no fire</option>` + junctions.map(j => `<option>${j}</option>`).join("");
+  const sDef = BLD === "hospital" ? "f2_j6" : "j19";
+  $("sFire").innerHTML = `<option value="">no fire</option>` + junctions.map(j => `<option ${j === sDef ? "selected" : ""}>${j}</option>`).join("");
+  floor = BLD === "hospital" ? 2 : 3; sFloor = BLD === "hospital" ? 2 : 0; wFloor = 0;
+  floorButtons($("floorBtns"), f => { floor = f; drawFrame(); }, floor);
+  floorButtons($("sFloorBtns"), f => { sFloor = f; if (signs) drawSigns(); }, sFloor);
+  floorButtons($("wFloorBtns"), f => { wFloor = f; drawWeak(); }, wFloor);
+  // forget everything computed for the other building
+  result = null; signs = null; weak = null; resultsLoaded = false; frameIdx = 0;
+  $("panels").innerHTML = ""; $("score").innerHTML = ""; $("status").textContent = "";
+  $("weakTable").innerHTML = ""; $("findings").innerHTML = ""; $("figs").innerHTML = "";
+  const on = document.querySelector(".tab.on").dataset.tab;
+  if (on === "signs") loadSigns(); if (on === "weak") loadWeak(); if (on === "results") loadResults();
+}
+
+(async function init() {
   $("methods").innerHTML = Object.keys(LABEL).filter(m => m !== "ml").map(m =>
     `<label><input type="checkbox" value="${m}" ${DEFAULT_METHODS.includes(m) ? "checked" : ""}><span style="color:${LINE[m]}">●</span> ${LABEL[m]}</label>`).join("");
-  const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
-  $("fire").innerHTML += junctions.map(j => `<option>${j}</option>`).join("");
-  $("sFire").innerHTML += junctions.map(j => `<option ${j === "j19" ? "selected" : ""}>${j}</option>`).join("");
   $("comp").oninput = () => $("compV").textContent = Math.round($("comp").value * 100) + "%";
   $("sRad").oninput = () => { $("sRadV").textContent = $("sRad").value; };
   $("sRad").onchange = () => loadSigns();
   $("sFire").onchange = () => loadSigns(); $("sStep").onchange = () => loadSigns();
-  floorButtons($("floorBtns"), f => { floor = f; drawFrame(); }, floor);
-  floorButtons($("sFloorBtns"), f => { sFloor = f; if (signs) drawSigns(); }, sFloor);
-  floorButtons($("wFloorBtns"), f => { wFloor = f; drawWeak(); }, wFloor);
   $("runBtn").onclick = runRace; $("play").onclick = play;
   $("scrub").oninput = e => { frameIdx = Number(e.target.value); drawFrame(); };
+  $("bld").onchange = () => { if (playing) play(); BLD = $("bld").value; loadBuilding(); };
   window.addEventListener("resize", () => { if (result) { for (const m of Object.keys(result.results)) views[m] = fitCanvas($(`cv-${m}`)); drawFrame(); } });
+  await loadBuilding();
 })();
 </script>
 </body>

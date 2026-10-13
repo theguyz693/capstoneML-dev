@@ -1,0 +1,151 @@
+{
+  "hosp_day_peak": {
+    "description": "Hospital, weekday OPD peak, no fire: 150 in OPD (ground), 40 in labs (1st), on each ward floor 50 patients/visitors in the wards (incl. wheelchair and bedridden) + 10 staff",
+    "building": "hospital",
+    "spawn": "groups",
+    "groups": [
+      {
+        "where": "^g_(op |waiting|reception)",
+        "n": 150,
+        "mix": {
+          "walk": 0.6,
+          "slow": 0.35,
+          "wheelchair": 0.05
+        }
+      },
+      {
+        "where": "^f1_(lab|information)",
+        "n": 40,
+        "mix": {
+          "walk": 0.6,
+          "slow": 0.4
+        }
+      },
+      {
+        "where": "^f2_general ward",
+        "n": 50,
+        "mix": {
+          "walk": 0.2,
+          "slow": 0.35,
+          "wheelchair": 0.15,
+          "bed": 0.3
+        }
+      },
+      {
+        "where": "^f2_(nurse|change|store)",
+        "n": 10,
+        "mix": {
+          "walk": 1.0
+        }
+      },
+      {
+        "where": "^f3_general ward",
+        "n": 50,
+        "mix": {
+          "walk": 0.2,
+          "slow": 0.35,
+          "wheelchair": 0.15,
+          "bed": 0.3
+        }
+      },
+      {
+        "where": "^f3_(nurse|change|store)",
+        "n": 10,
+        "mix": {
+          "walk": 1.0
+        }
+      }
+    ],
+    "fires": []
+  },
+  "hosp_day_fire_stairs1_f2": {
+    "description": "Day peak; fire at 2nd-floor stairwell 1 (east), smoke climbs that shaft",
+    "base": "hosp_day_peak",
+    "fires": [
+      {
+        "node": "f2_stairs 1",
+        "radius": 300,
+        "intensity": 1.0
+      }
+    ]
+  },
+  "hosp_day_fire_lobby": {
+    "description": "Day peak; fire in the ground-floor entrance lobby (main entrance side)",
+    "base": "hosp_day_peak",
+    "fires": [
+      {
+        "node": "g_j2",
+        "radius": 300,
+        "intensity": 1.0
+      }
+    ]
+  },
+  "hosp_day_spreading_f2": {
+    "description": "Day peak; fire starts in the 2nd-floor store room and spreads 0.5 m/s",
+    "base": "hosp_day_peak",
+    "fires": [
+      {
+        "node": "f2_store room",
+        "radius": 100,
+        "intensity": 1.0,
+        "spread_m_per_s": 0.5,
+        "max_radius": 700
+      }
+    ]
+  },
+  "hosp_day_compliance70": {
+    "description": "Day peak, no fire; 30% (mostly visitors) ignore guidance and head for the main entrance, half of them follow the crowd",
+    "base": "hosp_day_peak",
+    "compliance": 0.7,
+    "herding": 0.5,
+    "familiar_exit": "g_main entrance"
+  },
+  "hosp_night_wards_fire": {
+    "description": "Night: only the two ward floors occupied - 40 patients per floor (slow, wheelchair, bedridden) + 5 night staff; fire spreads from the 2nd-floor store room",
+    "building": "hospital",
+    "spawn": "groups",
+    "groups": [
+      {
+        "where": "^f2_general ward",
+        "n": 40,
+        "mix": {
+          "slow": 0.4,
+          "wheelchair": 0.2,
+          "bed": 0.4
+        }
+      },
+      {
+        "where": "^f2_nurse",
+        "n": 5,
+        "mix": {
+          "walk": 1.0
+        }
+      },
+      {
+        "where": "^f3_general ward",
+        "n": 40,
+        "mix": {
+          "slow": 0.4,
+          "wheelchair": 0.2,
+          "bed": 0.4
+        }
+      },
+      {
+        "where": "^f3_nurse",
+        "n": 5,
+        "mix": {
+          "walk": 1.0
+        }
+      }
+    ],
+    "fires": [
+      {
+        "node": "f2_store room",
+        "radius": 100,
+        "intensity": 1.0,
+        "spread_m_per_s": 0.5,
+        "max_radius": 700
+      }
+    ]
+  }
+}

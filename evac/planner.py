@@ -52,19 +52,21 @@ class Reservations:
         # back to slot s, or bookings land in the previous (full) slot and capacity is overbooked
         return int(math.floor(t / C.SLOT_S + 1e-9))
 
-    def entry_time(self, u, v, d, t):
-        """Earliest time >= t at which one more person can enter u->v."""
+    def entry_time(self, u, v, d, t, w=1.0):
+        """Earliest time >= t at which one more person (of size w person-equivalents) can enter u->v."""
         s = self.slot(t)
         c = self.cap(d)
         while True:
             if s * C.SLOT_S > self.now + self.horizon:   # beyond horizon: not predicted
                 return max(t, s * C.SLOT_S)
-            if self.book[(u, v, s)] < c:
+            # a person always fits an EMPTY slot, even one larger than the slot (e.g. a bed on a narrow door)
+            b = self.book[(u, v, s)]
+            if b + w <= c or b == 0:
                 return max(t, s * C.SLOT_S)
             s += 1
 
-    def reserve(self, u, v, t):
-        self.book[(u, v, self.slot(t))] += 1
+    def reserve(self, u, v, t, w=1.0):
+        self.book[(u, v, self.slot(t))] += w
 
 
 def _walk_time(d, speed_mult=1.0):
@@ -81,7 +83,7 @@ def _leg(d, speed_mult=1.0, walk=None):
     return t * _hazard_penalty(h) + extra
 
 
-def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0):
+def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0, w=1.0):
     """
     Time-dependent Dijkstra on 'generalised time' (walking time x hazard penalty + waiting).
     Returns (path, arrival_cost, [(u, v, entry_time), ...]) or (None, inf, []).
@@ -107,7 +109,7 @@ def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0):
             d = G.edges[u, v]
             if not _allowed(d, fire_active, step_free):
                 continue
-            te = res.entry_time(u, v, d, t)
+            te = res.entry_time(u, v, d, t, w)
             tv = te + _leg(d, speed_mult, res.walk.get((u, v)))
             if tv < best.get(v, math.inf):
                 best[v] = tv
@@ -117,7 +119,7 @@ def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0):
     return None, math.inf, []
 
 
-def path_cost(G, res, path, t0, fire_active=False, step_free=False, speed_mult=1.0):
+def path_cost(G, res, path, t0, fire_active=False, step_free=False, speed_mult=1.0, w=1.0):
     """Predicted generalised arrival time of a FIXED path under the current bookings.
     A path that now crosses a forbidden edge costs infinity (forces a switch)."""
     t = t0
@@ -125,16 +127,16 @@ def path_cost(G, res, path, t0, fire_active=False, step_free=False, speed_mult=1
         d = G.edges[u, v]
         if not _allowed(d, fire_active, step_free):
             return math.inf
-        t = res.entry_time(u, v, d, t) + _leg(d, speed_mult, res.walk.get((u, v)))
+        t = res.entry_time(u, v, d, t, w) + _leg(d, speed_mult, res.walk.get((u, v)))
     return t
 
 
-def book_path(G, res, path, t0, speed_mult=1.0):
+def book_path(G, res, path, t0, speed_mult=1.0, w=1.0):
     t = t0
     for u, v in zip(path, path[1:]):
         d = G.edges[u, v]
-        te = res.entry_time(u, v, d, t)
-        res.reserve(u, v, te)
+        te = res.entry_time(u, v, d, t, w)
+        res.reserve(u, v, te, w)
         t = te + _leg(d, speed_mult, res.walk.get((u, v)))
     return t
 
@@ -145,11 +147,12 @@ def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf, walk=None):
     order = sorted(agents, key=lambda a: (a.start, a.id))
     out = {}
     for a in order:
-        path, _cost, legs = earliest_route(G, res, a.origin, a.start, fire_active, a.step_free, a.speed_mult)
+        w = getattr(a, "size", 1.0)
+        path, _cost, legs = earliest_route(G, res, a.origin, a.start, fire_active, a.step_free, a.speed_mult, w)
         if path is None:
             continue
         for u, v, te in legs:
-            res.reserve(u, v, te)
+            res.reserve(u, v, te, w)
         out[a.id] = path
     return out
 
@@ -168,13 +171,13 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
         u, v = a.path[a.idx], a.path[a.idx + 1]
         d = G.edges[u, v]
         remaining = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult)
-        book_path(G, res, a.path[a.idx + 1:], now + remaining, a.speed_mult)
+        book_path(G, res, a.path[a.idx + 1:], now + remaining, a.speed_mult, getattr(a, "size", 1.0))
 
     # people who ignore guidance are not re-planned, but the planner sees where they are
     # heading and books their capacity first
     for a in standing:
         if not getattr(a, "compliant", True) and C.PLANNER_BOOK_NONCOMPLIANT:
-            book_path(G, res, a.path[a.idx:], max(a.start, now), a.speed_mult)
+            book_path(G, res, a.path[a.idx:], max(a.start, now), a.speed_mult, getattr(a, "size", 1.0))
 
     changes = 0
     for a in sorted((a for a in standing if getattr(a, "compliant", True)),
@@ -182,8 +185,9 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
         node = a.path[a.idx]
         t0 = max(a.start, now)
         cur = a.path[a.idx:]
-        cur_cost = path_cost(G, res, cur, t0, fire_active, a.step_free, a.speed_mult)
-        new, new_cost, _ = earliest_route(G, res, node, t0, fire_active, a.step_free, a.speed_mult)
+        w = getattr(a, "size", 1.0)
+        cur_cost = path_cost(G, res, cur, t0, fire_active, a.step_free, a.speed_mult, w)
+        new, new_cost, _ = earliest_route(G, res, node, t0, fire_active, a.step_free, a.speed_mult, w)
         back = a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
         gain = math.inf if cur_cost == math.inf else (cur_cost - new_cost) / max(1e-9, cur_cost - t0)
         if new is not None and new != cur and not back and gain >= switch_gain:
@@ -191,7 +195,7 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
             a.exit = new[-1]
             a.changes += 1
             changes += 1
-            book_path(G, res, new, t0, a.speed_mult)
+            book_path(G, res, new, t0, a.speed_mult, w)
         elif cur_cost < math.inf:
-            book_path(G, res, cur, t0, a.speed_mult)
+            book_path(G, res, cur, t0, a.speed_mult, w)
     return changes

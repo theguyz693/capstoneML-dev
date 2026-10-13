@@ -42,6 +42,17 @@ python -m evac.ga                  # genetic-algorithm exit assignment (offline 
 python -m evac.final_experiments   # full matrix: 30 seeds, ML-in-loop, GA, bound, tipping, freshness, ablations (~1 h, 2 cores)
 python -m evac.final_report        # tables + figures -> docs/final_results.md
 ```
+
+### Second building: oncology hospital
+```bash
+python -m evac.hospital --import <folder with the team's hospital files>   # -> data/hospital/hospital_graph.json (already done)
+python -m evac.hospital_experiments    # 6 scenarios x 7 methods x 30 seeds, bound, weak spots, assumptions (~15 min)
+python -m evac.hospital_report         # -> docs/hospital_results.md, figures 18-21
+python tests/test_evac_hospital.py
+```
+The dashboard has a building selector (campus / hospital) in the top bar.
+Hospital scenarios use `"spawn": "groups"` with occupant profiles (`config.PROFILES`: walk, slow, wheelchair,
+bed - speed, stairs allowed, capacity used, preparation time). New edge type `ramp` (step-free, usable in a fire).
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
 
 ## Files
@@ -67,6 +78,8 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `tune.py` | Optuna (TPE) tuning of planner settings with held-out check. |
 | `ga.py` | Genetic algorithm over exit assignments (fitness = full simulation). |
 | `final_experiments.py` / `final_report.py` | Final experiment matrix and the report generator. |
+| `hospital.py` | Imports the team's hospital drawings data (scale from the 54,675 mm dimension, floors aligned on shared shafts), loads it, hospital scenarios. |
+| `hospital_experiments.py` / `hospital_report.py` | Session 6 experiments on the hospital + patient groups, ramp weak spot, hospital assumptions. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

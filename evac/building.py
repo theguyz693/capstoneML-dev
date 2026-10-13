@@ -5,7 +5,7 @@ Loads a building into a NetworkX graph with physical attributes the simulator ne
 The geometry (node positions, floor alignment) mirrors
 ml_edge_updater.build_full_campus_graph() exactly, so routes and the 3D view
 stay consistent. On top of that, every node gets a `kind` and every edge gets:
-  etype        corridor | room_door | exit_door | stair | lift
+  etype        corridor | room_door | exit_door | stair | lift | ramp
   length_m     walking length in metres
   width_m      effective width
   flow_cap     max persons per second that can ENTER the edge
@@ -50,6 +50,8 @@ def _edge_type(G, u, v) -> str:
     if G.nodes[u]["floor"] != G.nodes[v]["floor"]:
         if ku == "lift" or kv == "lift":
             return "lift"
+        if ku == "ramp" and kv == "ramp":
+            return "ramp"
         return "stair"
     if ku == "exit" or kv == "exit":
         return "exit_door"
@@ -67,6 +69,9 @@ def _attach_physics(G):
         elif et == "lift":
             length = C.STAIR_FLIGHT_LENGTH_M
             speed = C.FREE_WALK_SPEED
+        elif et == "ramp":
+            length = C.RAMP_LENGTH_PER_FLOOR_M
+            speed = C.RAMP_SPEED
         else:
             length = max(1.0, d["base_distance"] * C.METERS_PER_UNIT)
             speed = C.FREE_WALK_SPEED
@@ -85,12 +90,13 @@ def _attach_physics(G):
     return G
 
 
-def build_graph(nodes, edges, floor_height=350):
+def build_graph(nodes, edges, floor_height=350, kinds=None):
     """
     Build ANY building from plain data.
       nodes: {name: (x, y, floor)}  - x, y in the same units as METERS_PER_UNIT
       edges: [(u, v), ...]          - physically walkable connections only
-    Node kinds come from names (exit/entrance, stairs, lift, j*, otherwise room),
+      kinds: optional {name: kind} overrides (exit | stair | lift | ramp | junction | room)
+    Node kinds otherwise come from names (exit/entrance, stairs, lift, j*, otherwise room),
     so a new building only needs the same naming conventions as campus_data.py.
     """
     G = nx.Graph()
@@ -102,8 +108,16 @@ def build_graph(nodes, edges, floor_height=350):
             dist = math.sqrt((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2 + (a["z"] - b["z"]) ** 2)
             G.add_edge(u, v, base_distance=round(dist, 2))
     for n in G.nodes:
-        G.nodes[n]["kind"] = node_kind(n)
+        G.nodes[n]["kind"] = (kinds or {}).get(n) or node_kind(n)
     return _attach_physics(G)
+
+
+def load_building(name="campus"):
+    """'campus' (default) or 'hospital'."""
+    if name == "hospital":
+        from .hospital import load_hospital
+        return load_hospital()
+    return load_campus()
 
 
 def load_campus():

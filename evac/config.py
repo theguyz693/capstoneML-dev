@@ -26,6 +26,9 @@ STAIR_FLIGHT_LENGTH_M = 8.0
 # ---------------------------------------------------------------- speeds
 FREE_WALK_SPEED = 1.25        # m/s, corridors/doors, free flow
 STAIR_DOWN_SPEED = 0.65       # m/s along the stair slope (descending)
+# Floor-to-floor ramp (hospital). Drawings: two 8 m runs + 2 m landings each way per floor (switchback)
+RAMP_LENGTH_PER_FLOOR_M = 40.0
+RAMP_SPEED = 1.0              # m/s walking down a ~1:12 ramp (ASSUMPTION)
 MIN_SPEED_FRACTION = 0.10     # agents never fully freeze while on an edge
 JAM_DENSITY = 5.4             # persons/m^2 (Weidmann)
 AGENT_SPEED_SPREAD = 0.15     # +/- 15% individual speed variation
@@ -38,6 +41,7 @@ WIDTH_M = {
     "exit_door": 1.8,
     "stair": 1.2,
     "lift": 1.0,
+    "ramp": 2.1,      # hospital switchback ramp: 2125 mm clear width on the drawings
 }
 
 # ---------------------------------------------------------------- flow
@@ -48,6 +52,7 @@ SPECIFIC_FLOW = {
     "exit_door": 1.3,
     "stair": 1.1,
     "lift": 0.3,
+    "ramp": 1.3,      # treated like a level corridor (gentle 1:12 slope)
 }
 
 # ---------------------------------------------------------------- hazards
@@ -95,3 +100,19 @@ STAIR_SMOKE_DELAY_S = 30.0    # in a spreading fire, smoke needs ~30 s per floor
 DT = 0.5                      # seconds per simulation step
 MAX_TIME_S = 1800.0           # stop after 30 minutes of simulated time
 PRE_MOVEMENT_MAX_S = 30.0     # each agent starts after U(0, this) seconds
+
+
+# ---------------------------------------------------------------- occupant profiles (hospital)
+# Used by scenarios with "spawn": "groups". ASSUMPTIONS for comparison purposes, in the range reported
+# for hospital evacuation studies (wheelchair ~0.7-0.9 m/s, assisted bed movement ~0.5 m/s, bed occupies
+# roughly 4 person-equivalents of corridor/door capacity, beds need preparation before moving).
+#   speed      multiplier on walking speed
+#   step_free  cannot use stairs (ramp / lifts only)
+#   size       person-equivalents of door/corridor capacity used
+#   pre_s      (min, max) pre-movement time in seconds
+PROFILES = {
+    "walk":       {"speed": 1.0, "step_free": False, "size": 1.0, "pre_s": (0, 30)},    # staff, visitors
+    "slow":       {"speed": 0.6, "step_free": False, "size": 1.0, "pre_s": (10, 60)},   # walking patients, elderly
+    "wheelchair": {"speed": 0.7, "step_free": True,  "size": 2.0, "pre_s": (20, 90)},
+    "bed":        {"speed": 0.5, "step_free": True,  "size": 4.0, "pre_s": (60, 240)},  # bed pushed by staff
+}

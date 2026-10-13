@@ -42,9 +42,9 @@ def _ekey(u, v):
 class Agent:
     __slots__ = ("id", "origin", "path", "idx", "pos", "state", "start", "speed_mult",
                  "step_free", "queued_at", "t_out", "exposed", "max_hazard", "exit", "changes", "t_left",
-                 "compliant", "herds", "edge_log")
+                 "compliant", "herds", "edge_log", "size", "profile")
 
-    def __init__(self, aid, origin, start, speed_mult, step_free):
+    def __init__(self, aid, origin, start, speed_mult, step_free, size=1.0, profile=None):
         self.id = aid
         self.origin = origin
         self.path = None
@@ -64,10 +64,46 @@ class Agent:
         self.compliant = True
         self.herds = False
         self.edge_log = None
+        self.size = size      # person-equivalents of door/corridor capacity (a bed ~ 4)
+        self.profile = profile or ("step_free" if step_free else "walk")
+
+
+def _spawn_groups(G, scenario, rng):
+    """'spawn': 'groups' - several groups, each with its own rooms and mix of occupant profiles:
+       "groups": [{"where": "<regex on room names>", "n": 40, "mix": {"walk": 0.5, "bed": 0.5}}, ...]
+    Profiles (speed, step-free, size, pre-movement) are in config.PROFILES."""
+    import re
+    rooms = room_nodes(G)
+    spread = float(scenario.get("speed_spread", C.AGENT_SPEED_SPREAD))
+    agents = []
+    for g in scenario["groups"]:
+        pool = [r for r in rooms if re.search(g["where"], r)]
+        if not pool:
+            raise ValueError(f"no rooms match {g['where']!r}")
+        names, weights = zip(*sorted(g.get("mix", {"walk": 1.0}).items()))
+        for _ in range(int(g["n"])):
+            prof = rng.choices(names, weights)[0]
+            P = C.PROFILES[prof]
+            agents.append(Agent(
+                aid=len(agents), origin=pool[rng.randrange(len(pool))],
+                start=rng.uniform(*P["pre_s"]),
+                speed_mult=P["speed"] * (1.0 + rng.uniform(-spread, spread)),
+                step_free=P["step_free"], size=P["size"], profile=prof))
+    return agents
 
 
 def spawn(G, scenario, rng):
-    """Create agents. scenario keys: n_agents, spawn ('building'|'single'|'floor'), origin, floor, step_free_frac"""
+    """Create agents. scenario keys: n_agents, spawn ('building'|'single'|'floor'|'groups'), origin, floor,
+    step_free_frac, groups"""
+    if scenario.get("spawn") == "groups":
+        agents = _spawn_groups(G, scenario, rng)
+        brng = random.Random(f"behaviour-{scenario.get('_seed', 0)}")
+        p = float(scenario.get("compliance", C.COMPLIANCE))
+        h = float(scenario.get("herding", C.HERDING))
+        for a in agents:
+            a.compliant = brng.random() < p
+            a.herds = (not a.compliant) and brng.random() < h
+        return agents
     rooms = room_nodes(G)
     n = int(scenario.get("n_agents", 100))
     mode = scenario.get("spawn", "building")
@@ -369,7 +405,7 @@ def run(G, scenario, method, seed):
                 arrived.append(a)
         for a in arrived:
             u, v = a.path[a.idx], a.path[a.idx + 1]
-            occ[_ekey(u, v)] -= 1
+            occ[_ekey(u, v)] -= a.size
             if log_edges and a.edge_log is not None:
                 edge_rows.append({**a.edge_log, "target_time_s": round(t + C.DT - a.edge_log["_t_join"], 2)})
                 a.edge_log = None
@@ -397,8 +433,8 @@ def run(G, scenario, method, seed):
                     waiting.append(a)        # will be detoured at the next hazard update
                     continue
                 if budget[k] >= 1.0 and occ[k] < d["jam_cap"]:
-                    budget[k] -= 1.0
-                    occ[k] += 1
+                    budget[k] -= a.size          # a bed uses ~4 person-equivalents (budget may go negative = door busy)
+                    occ[k] += a.size
                     a.state = "moving"
                     if a.t_left is None:
                         a.t_left = t
@@ -460,7 +496,7 @@ def run(G, scenario, method, seed):
         snapshot(t)
         metrics["frames"] = frames
     records = [
-        {"agent": a.id, "origin": a.origin, "step_free": a.step_free, "state": a.state,
+        {"agent": a.id, "origin": a.origin, "step_free": a.step_free, "profile": a.profile, "state": a.state,
          "exit": a.exit, "t_left": a.t_left, "t_out": a.t_out, "exposed": a.exposed, "route_changes": a.changes}
         for a in agents
     ]

@@ -34,6 +34,8 @@ FIG = os.path.join(ROOT, "docs", "figures", "fig5_weakspots.png")
 def _label(G, edges, kind):
     if kind == "stair_shaft":
         return f"Stairwell {edges[0][0].split()[-1]} (all floors)"
+    if kind == "ramp":
+        return "Ramp (all floors)"
     u, v = edges[0]
     if kind == "exit_door":
         return f"Exit door: {u if G.nodes[u]['kind'] == 'exit' else v}"
@@ -48,6 +50,9 @@ def candidates(G, n_corridors=12):
         if d["etype"] == "stair":
             shafts.setdefault(u.split()[-1], []).append((u, v))
     out = [("stair_shaft", e) for _, e in sorted(shafts.items())]
+    ramp = [(u, v) for u, v, d in G.edges(data=True) if d["etype"] == "ramp"]
+    if ramp:                                   # hospital: the floor-to-floor ramp fails as a unit
+        out.append(("ramp", ramp))
     out += [("exit_door", [(u, v)]) for u, v, d in G.edges(data=True) if d["etype"] == "exit_door"]
     ex = exits(G)
     H = nx.Graph((u, v, {"w": d["length_m"]}) for u, v, d in G.edges(data=True)
@@ -60,7 +65,7 @@ def candidates(G, n_corridors=12):
 
 
 def analyse(scenario, method="ccrp", seeds=(0, 1, 2), G0=None):
-    G0 = G0 or load_campus()
+    G0 = G0 if G0 is not None else load_campus()
     base = [run(G0.copy(), scenario, method, s)[0] for s in seeds]
     b_last = statistics.mean(m["evac_time_last_s"] for m in base)
     b_mean = statistics.mean(m["evac_time_mean_s"] for m in base)
