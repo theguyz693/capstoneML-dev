@@ -153,6 +153,62 @@ def signs(req: SignRequest):
     return res
 
 
+class RouteRequest(BaseModel):
+    building: str = "campus"
+    origin: str
+    fire_node: Optional[str] = None
+    fire_radius: float = 400.0
+    step_free: bool = False
+    crowd_scenario: Optional[str] = None     # e.g. "floor3_full_200": everyone in that scenario evacuates too
+    at_s: float = 30.0                       # ... and this is the crowd at this many seconds after the alarm
+
+
+@router.post("/route")
+def route(req: RouteRequest):
+    """One person's evacuation route + time-to-exit from the research engine and the learned model (ML v3):
+    edge times predicted by the model from the current smoke and crowd, burning edges removed, smoke penalised.
+    Also returns the plain shortest safe route for comparison."""
+    from . import config as C
+    from .learned_planner import route_eta
+    Gb = G0(req.building)
+    if req.origin not in Gb:
+        raise HTTPException(400, f"unknown node {req.origin}")
+    fires = []
+    if req.fire_node:
+        if req.fire_node not in Gb:
+            raise HTTPException(400, f"unknown node {req.fire_node}")
+        fires = [{"node": req.fire_node, "radius": req.fire_radius, "intensity": 1.0}]
+    G = apply_hazard(Gb.copy(), fires)
+    state, crowd = None, None
+    if req.crowd_scenario:
+        scen = _scenarios(req.building)
+        if req.crowd_scenario not in scen:
+            raise HTTPException(400, f"unknown scenario {req.crowd_scenario}")
+        sc = {**scen[req.crowd_scenario], "fires": fires, "stop_at_s": max(0.0, min(600.0, req.at_s))}
+        m, _ = run(Gb.copy(), sc, "lookahead", 0)
+        state = m["state"]
+        crowd = {"scenario": req.crowd_scenario, "at_s": req.at_s, "people_inside": state["inside"],
+                 "busiest": sorted(((n, q) for n, q in state["qnode"].items() if q > 0), key=lambda kv: -kv[1])[:5]}
+    prof = C.PROFILES["wheelchair"] if req.step_free else C.PROFILES["walk"]
+    old = C.DELAY_MODEL
+    C.DELAY_MODEL = "v3"
+    try:
+        r = route_eta(G, req.origin, bool(fires), req.step_free, state, prof["speed"], prof["size"])
+    finally:
+        C.DELAY_MODEL = old
+    base = route_table(G, "safe_shortest", bool(fires), req.step_free).get(req.origin)
+    r.update({"baseline_path": base, "crowd": crowd,
+              "hazard": {n: G.nodes[n]["hazard"] for n in G if G.nodes[n]["hazard"] > 0},
+              "peak_hazard": max((G.nodes[n]["hazard"] for n in (r["path"] or [])), default=0.0)})
+    if r["path"]:
+        lo, hi = r.get("eta_lo_s"), r.get("eta_hi_s")
+        rng = f"{lo / 60:.1f}-{hi / 60:.1f} min" if lo is not None else f"~{r['eta_s'] / 60:.1f} min"
+        r["message"] = f"Exit via {r['exit']} - about {rng} to get out"
+    else:
+        r["message"] = "No safe route. Stay in a protected area and wait for assistance."
+    return r
+
+
 @router.get("/weakspots")
 def weakspots(building: str = "campus"):
     p = os.path.join(ROOT, "docs", "hospital_weakspots.json" if _check(building) == "hospital" else "weakspots.json")
@@ -170,9 +226,8 @@ FIGURES = [  # (file, title, one-line takeaway) shown on the Results tab, in pre
     ("fig17_ablation.png", "Ablations", "Capacity booking and sustainable stair capacity are the essential parts."),
     ("fig13_fairness.png", "Fairness", "Who pays: step-free users, upper floors, lower floors."),
     ("fig10_sensitivity.png", "Sensitivity", "The ranking survives changes to every physical assumption."),
-    ("fig6_model_comparison.png", "Delay model comparison", "Grouped cross-validation: learned models vs textbook formula."),
-    ("fig8_shap.png", "What the model looks at", "SHAP: crowd density and planned users dominate."),
-    ("fig9_conformal.png", "Uncertainty", "Conformal intervals: calibrated 90% ranges for predicted delays."),
+    ("fig28_calibration.png", "Calibration on real crowds", "Speed-density and door flow fitted to Juelich experiments."),
+    ("fig29_ml_v3.png", "ML v3 vs real data", "Hybrid model: halves the error on simulated data, matches the formula on real people, better in queues."),
     ("fig11_tuning.png", "Automatic tuning", "Bayesian optimisation of planner settings, with a held-out check."),
 ]
 

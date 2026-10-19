@@ -32,7 +32,7 @@ from . import planner
 from . import learned_planner
 
 
-from .physics import weidmann_speed_factor  # noqa: E402  (re-exported for older imports)
+from .physics import weidmann_speed_factor, smoke_speed_factor, edge_density  # noqa: E402
 
 
 def _ekey(u, v):
@@ -346,7 +346,7 @@ def run(G, scenario, method, seed):
                 "etype": d["etype"], "length_m": d["length_m"], "width_m": d["width_m"],
                 "eff_cap": round(d["eff_cap"], 3), "free_speed": d["free_speed"],
                 "hazard": d.get("hazard", 0.0), "queue_ahead": ahead, "queue_at_node": len(queues[node]) - 1,
-                "on_edge": occ[k], "density": round(occ[k] / (d["length_m"] * d["width_m"]), 3),
+                "on_edge": occ[k], "density": round(edge_density(d, occ[k]), 3),
                 "planned_users": planned, "mover_speed": round(a.speed_mult, 3), "mover_size": a.size,
                 "_t_join": now,
             }
@@ -380,7 +380,8 @@ def run(G, scenario, method, seed):
                         int(a.compliant)])
         frames.append({"t": round(now, 1), "pts": pts,
                        "hazard": {n: G.nodes[n]["hazard"] for n in G if G.nodes[n]["hazard"] > 0} if dynamic else None})
-    while t < C.MAX_TIME_S and (active or moving or any(queues.values())):
+    stop_at = float(scenario.get("stop_at_s", C.MAX_TIME_S))      # snapshot mode (dashboard route queries)
+    while t < min(C.MAX_TIME_S, stop_at) and (active or moving or any(queues.values())):
         if track_every and t >= next_frame:
             next_frame += track_every
             snapshot(t)
@@ -430,11 +431,12 @@ def run(G, scenario, method, seed):
             u, v = a.path[a.idx], a.path[a.idx + 1]
             d = G.edges[u, v]
             k = _ekey(u, v)
-            dens = occ[k] / (d["length_m"] * d["width_m"])
+            dens = edge_density(d, occ[k])
             peak_density = max(peak_density, dens)
             if trace_key is not None and k == trace_key:
                 edge_trace.append((round(t, 2), round(dens, 3), round(weidmann_speed_factor(dens) * d["free_speed"], 3)))
-            a.pos += d["free_speed"] * a.speed_mult * weidmann_speed_factor(dens) * C.DT
+            a.pos += (d["free_speed"] * a.speed_mult * weidmann_speed_factor(dens)
+                      * smoke_speed_factor(d.get("hazard", 0.0)) * C.DT)
             if a.pos >= d["length_m"]:
                 arrived.append(a)
         for a in arrived:
@@ -530,6 +532,20 @@ def run(G, scenario, method, seed):
         metrics["edge_trace"] = edge_trace
     if log_edges:
         metrics["edge_rows"] = edge_rows
+    if "stop_at_s" in scenario:            # crowd state at stop_at_s, as counts the learned model can use
+        qa, qnode, planned = defaultdict(int), {}, defaultdict(int)
+        for node, q in queues.items():
+            qnode[node] = len(q)
+            for a in q:
+                if a.idx < len(a.path) - 1:
+                    qa[(node, a.path[a.idx + 1])] += 1
+        for a in agents:
+            if a.path and a.state not in ("evacuated", "needs_assistance", "stranded", "in_place"):
+                for i in range(a.idx, len(a.path) - 1):
+                    planned[(a.path[i], a.path[i + 1])] += 1
+        metrics["state"] = {"qa": dict(qa), "qnode": qnode, "occ": {k: v for k, v in occ.items() if v > 0},
+                            "planned": dict(planned), "t": t,
+                            "inside": sum(a.state in ("waiting", "queued", "moving") for a in agents)}
     if track_every:
         snapshot(t)
         metrics["frames"] = frames

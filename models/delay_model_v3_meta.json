@@ -1,0 +1,53 @@
+{
+ "features": [
+  "is_stair",
+  "is_room_door",
+  "is_exit_door",
+  "is_corridor",
+  "is_ramp",
+  "length_m",
+  "width_m",
+  "eff_cap",
+  "free_speed",
+  "hazard",
+  "queue_ahead",
+  "queue_at_node",
+  "on_edge",
+  "density",
+  "planned_users",
+  "mover_speed",
+  "mover_size",
+  "t_formula",
+  "t_queue",
+  "t_walk_free",
+  "onedge_per_cap",
+  "planned_per_cap"
+ ],
+ "train_rows": 784014,
+ "rows_by_source": {
+  "hospital": 310822,
+  "campus": 294215,
+  "synthetic": 178977
+ },
+ "simulator": "calibrated on Juelich experiments (evac/calibrated_params.json) + smoke slowdown",
+ "model": "hybrid: time = formula_time x exp(LightGBM(x)); evac/learned_planner.hybrid_predict",
+ "target": "log(target_time_s / formula_time); target_time_s = seconds from reaching the edge to leaving it (queue + walk)",
+ "quantiles": [
+  "q05",
+  "q95"
+ ],
+ "real_log_margin": 0.3026520182015456,
+ "real_conformal_check": {
+  "calibration_runs": [
+   "040_c_56_h-",
+   "traj_UNI_CORR_500_08",
+   "uo-060-180-180",
+   "uo-100-180-180",
+   "uo-180-180-070",
+   "uo-180-180-120"
+  ],
+  "test_coverage_before": 0.3489702517162471,
+  "test_coverage_after": 0.8752860411899314,
+  "margin_from_half": 0.2910156356752751
+ }
+}

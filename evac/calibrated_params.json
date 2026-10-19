@@ -1,0 +1,24 @@
+{
+ "params": {
+  "FREE_WALK_SPEED": 1.373,
+  "FD_GAMMA": 2.579,
+  "JAM_DENSITY": 4.35,
+  "DOOR_APPROACH_WIDTH_M": 2.0,
+  "SPECIFIC_FLOW": {
+   "room_door": 1.93,
+   "exit_door": 1.93,
+   "corridor": 1.41,
+   "ramp": 1.41
+  }
+ },
+ "fit": {
+  "v0": 1.3733713538411092,
+  "gamma": 2.578519626959608,
+  "rho_max": 4.354296966174621,
+  "rmse_before": 0.2087217564277388,
+  "rmse_after": 0.1569908068892322,
+  "fd_points": 14838,
+  "door_flow_least_squares": 1.9773360533866156
+ },
+ "source": "Juelich experiments via PedPy demo data (data/juelich); evac/calibration.py"
+}

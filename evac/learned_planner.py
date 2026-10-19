@@ -28,7 +28,7 @@ import numpy as np
 
 from . import config as C
 from .building import exits
-from .physics import weidmann_speed_factor
+from .physics import weidmann_speed_factor, smoke_speed_factor, edge_density
 from .routing import _allowed, _hazard_penalty
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,14 +40,16 @@ ET = ("stair", "room_door", "exit_door", "corridor")
 
 
 def _load(kind):
-    """kind: 'ml' or 'ml_upper'; config.DELAY_MODEL picks the version (v1 = campus-trained, Session 6;
-    v2 = trained on both buildings with ramp + mover features, Session 7)."""
+    """kind: 'ml', 'ml_upper' (95 % quantile) or 'ml_lower' (5 %, v3 only); config.DELAY_MODEL picks the version
+    (v1 = campus-trained, Session 6; v2 = both buildings, Session 7; v3 = calibrated simulator + random
+    geometries, tested on real data - Improving ML, evac/ml_v3.py)."""
     ver = getattr(C, "DELAY_MODEL", "v1")
     key = (kind, ver)
     if key not in _models:
         import joblib
         suffix = "" if ver == "v1" else f"_{ver}"
-        name = {"ml": f"delay_lgbm{suffix}.joblib", "ml_upper": f"delay_lgbm{suffix}_q95.joblib"}[kind]
+        name = {"ml": f"delay_lgbm{suffix}.joblib", "ml_upper": f"delay_lgbm{suffix}_q95.joblib",
+                "ml_lower": f"delay_lgbm{suffix}_q05.joblib"}[kind]
         path = os.path.join(MODELDIR, name)
         if not os.path.exists(path):
             raise FileNotFoundError(f"{path} missing - run: python -m evac.ml_study (v1) / python -m evac.ml_transfer (v2)")
@@ -76,28 +78,68 @@ COLS = ["is_stair", "is_room_door", "is_exit_door", "is_corridor", "is_ramp", "l
 
 def _features(G, idx, queues, occ, planned):
     """One row per directed edge; every column any model version may use (named, see COLS)."""
-    import pandas as pd
-    n = len(idx.edges)
-    dyn = np.zeros((n, 6))
     qa = defaultdict(int)
     for node, q in queues.items():
         for a in q:
             if a.idx < len(a.path) - 1:
                 qa[(node, a.path[a.idx + 1])] += 1
+    qnode = {u: len(q) for u, q in queues.items()}
+    return features_from_counts(G, idx, qa, qnode, occ, planned)
+
+
+def features_from_counts(G, idx, qa, qnode, occ, planned, mover_speed=1.0, mover_size=1.0):
+    """Same rows from plain counts: qa {(u, v): people queued at u for u->v}, qnode {u: people at u},
+    occ {sorted edge: people on it}, planned {(u, v): people whose route uses u->v}."""
+    import pandas as pd
+    n = len(idx.edges)
+    dyn = np.zeros((n, 6))
     for i, (u, v) in enumerate(idx.edges):
         d = G.edges[u, v]
         k = (u, v) if u <= v else (v, u)
-        dyn[i] = [d.get("hazard", 0.0), qa.get((u, v), 0), len(queues.get(u, ())), occ.get(k, 0),
-                  occ.get(k, 0) / (d["length_m"] * d["width_m"]), planned.get((u, v), 0)]
-    mover = np.ones((n, 2))            # predictions are for a standard person (speed x1, size 1)
+        dyn[i] = [d.get("hazard", 0.0), qa.get((u, v), 0), qnode.get(u, 0), occ.get(k, 0),
+                  edge_density(d, occ.get(k, 0)), planned.get((u, v), 0)]
+    mover = np.tile([mover_speed, mover_size], (n, 1))     # default: a standard person (speed x1, size 1)
     return pd.DataFrame(np.hstack([idx.static, dyn, mover]), columns=COLS)
+
+
+V3_EXTRA = ["t_formula", "t_queue", "t_walk_free", "onedge_per_cap", "planned_per_cap"]
+
+
+def formula_time(X):
+    """Textbook queueing estimate (seconds): people queued ahead / capacity + length / speed at the current
+    density and smoke. The physics part of the hybrid model."""
+    f = np.array([weidmann_speed_factor(x) for x in X["density"]])
+    s = np.array([smoke_speed_factor(h) for h in X["hazard"]])
+    mv = X["mover_speed"].to_numpy() if "mover_speed" in X else 1.0
+    return (X["queue_ahead"] / X["eff_cap"] + X["length_m"] / (X["free_speed"] * mv * f * s)).to_numpy()
+
+
+def add_physics(X):
+    """v3 inputs: the raw features + physics-derived ones (formula time, queue time, free walking time, people
+    on the edge / planned per unit of capacity). Dimensionless-style inputs let the model carry over to widths,
+    lengths and crowd sizes it has not seen."""
+    X = X.copy()
+    X["t_formula"] = formula_time(X)
+    X["t_queue"] = X["queue_ahead"] / X["eff_cap"]
+    X["t_walk_free"] = X["length_m"] / (X["free_speed"] * X["mover_speed"])
+    X["onedge_per_cap"] = X["on_edge"] / X["eff_cap"]
+    X["planned_per_cap"] = X["planned_users"] / X["eff_cap"]
+    return X
+
+
+def hybrid_predict(model, X):
+    """v3 is a HYBRID model: it learns a correction factor on top of the physics formula,
+    time = formula x exp(model(x)), so where data is thin it falls back towards the physics."""
+    Xp = add_physics(X)
+    return np.maximum(Xp["t_formula"].to_numpy(), 0.3) * np.exp(model.predict(Xp[list(model.feature_name_)]))
 
 
 def _predict(kind, X):
     if kind == "formula":
-        f = np.array([weidmann_speed_factor(x) for x in X["density"]])
-        return (X["queue_ahead"] / X["eff_cap"] + X["length_m"] / (X["free_speed"] * f)).to_numpy()
+        return formula_time(X)
     m = _load(kind)
+    if getattr(C, "DELAY_MODEL", "v1") == "v3":
+        return np.maximum(0.1, hybrid_predict(m, X))
     cols = list(getattr(m, "feature_name_", None) or __import__("evac.delay_model", fromlist=["FEATURES"]).FEATURES)
     return np.maximum(0.1, m.predict(X[cols]))
 
@@ -184,3 +226,47 @@ def walk_predictions(G, idx, agents, queues, occ):
     X["queue_at_node"] = 0.0
     p = _predict("ml", X)
     return {e: float(p[i]) for i, e in enumerate(idx.edges)}
+
+
+def _real_margin():
+    """Widening factor for the 5-95 % range, from conformal calibration on REAL crossings (evac/ml_v3.py)."""
+    import json
+    p = os.path.join(MODELDIR, f"delay_model_{getattr(C, 'DELAY_MODEL', 'v1')}_meta.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            return float(math.exp(json.load(f).get("real_log_margin", 0.0)))
+    except (OSError, ValueError):
+        return 1.0
+
+
+def route_eta(G, origin, fire_active, step_free=False, state=None, mover_speed=1.0, mover_size=1.0):
+    """Navigation query for one person (dashboard 'Evac Route' and kiosk signs):
+    route = Dijkstra on PREDICTED crossing times (learned model) x hazard penalty (+ exposure penalty), edges
+    on fire removed (rule, not ML); time-to-exit = sum of predicted times along the route, with a range from
+    the 5 % / 95 % quantile models. state: optional crowd snapshot from the simulator
+    {"qa": {(u, v): n}, "qnode": {u: n}, "occ": {edge: n}, "planned": {(u, v): n}}.
+    Note: the crowd is taken as it is NOW (it does not evolve along the route), so with heavy crowds the range
+    is a rough guide - the capacity planner (lookahead) is what coordinates many people."""
+    st = state or {}
+    idx = EdgeIndex(G)
+    X = features_from_counts(G, idx, st.get("qa", {}), st.get("qnode", {}), st.get("occ", {}),
+                             st.get("planned", {}), mover_speed, mover_size)
+    med = _predict("ml", X)
+    try:
+        lo, hi = np.minimum(_predict("ml_lower", X), med), np.maximum(_predict("ml_upper", X), med)
+        lo, hi = lo / _real_margin(), hi * _real_margin()
+    except (FileNotFoundError, KeyError):
+        lo = hi = None
+    _dist, tab = _table(G, idx, med, fire_active, step_free)
+    path = tab.get(origin)
+    if not path:
+        return {"path": None}
+    pos = [idx.pos[(u, v)] for u, v in zip(path, path[1:])]
+    legs = [{"from": u, "to": v, "etype": G.edges[u, v]["etype"], "hazard": round(G.edges[u, v].get("hazard", 0.0), 2),
+             "pred_s": round(float(med[i]), 1)} for (u, v), i in zip(zip(path, path[1:]), pos)]
+    out = {"path": path, "exit": path[-1], "eta_s": round(float(med[pos].sum()), 1), "legs": legs,
+           "model": getattr(C, "DELAY_MODEL", "v1")}
+    if lo is not None:
+        out["eta_lo_s"] = round(float(lo[pos].sum()), 1)
+        out["eta_hi_s"] = round(float(hi[pos].sum()), 1)
+    return out

@@ -88,6 +88,25 @@ Hospital scenarios use `"spawn": "groups"` with occupant profiles (`config.PROFI
 bed - speed, stairs allowed, capacity used, preparation time). New edge type `ramp` (step-free, usable in a fire).
 Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-values).
 
+### Improving ML: calibrated simulator, smoke slows people, one hybrid model tested on real data
+```bash
+python -m evac.calibration          # fit speed-density + door flow to Juelich trajectories (data/juelich) -> docs/calibration.md
+python -m evac.ml_v3                # dataset from the calibrated simulator, hybrid model v3, real-data test -> docs/ml_v3.md
+python tests/test_evac_improving_ml.py
+```
+- `config.PARAM_SET = "juelich"` (default, calibrated: `evac/calibrated_params.json`) or `"sfpe"` (the earlier
+  handbook values; all results before this session). `config.use_params(name)` switches, then rebuild the graph.
+- Smoke slows walking: `physics.smoke_speed_factor` (Frantzich & Nilsson 2003, as in FDS+Evac); used by the simulator,
+  the planners and the baselines.
+- Door edges measure crowd density over the approach space (`DOOR_APPROACH_WIDTH_M`), so crowded doors no longer
+  slow their own outflow to half the measured value.
+- `config.DELAY_MODEL = "v3"`: time = physics formula x learned correction (`learned_planner.hybrid_predict`), with
+  5 %/95 % quantile models widened by conformal calibration on real crossings.
+- Dashboard: the **Evac Route** tab of `index.html` now uses `/api/research/route` (research engine + ML v3) for both
+  buildings, with a time-to-exit range and an optional crowd ("other people evacuating" = a simulated scenario
+  snapshot, `stop_at_s`). The old Random-Forest route (`server.py /api/evacuate`, "v1") is no longer used.
+- All main results were re-run with the calibrated parameters; the earlier reports are in `docs/archive_handbook_params/`.
+
 ## Files
 | File | What it does |
 | --- | --- |
@@ -118,6 +137,8 @@ Results go to `results/` (one row per run). `scipy` is optional (Wilcoxon p-valu
 | `hospital_experiments.py` / `hospital_report.py` | Session 6 experiments on the hospital + patient groups, ramp weak spot, hospital assumptions. |
 | `literature.py` / `literature_experiments.py` | Published baselines: quickest-path route choice and CASPER, and their experiment (Session 9). |
 | `jupedsim_check.py` | Cross-check of the simulator against JuPedSim on the same geometry and people (Session 9). |
+| `calibration.py` | Calibration of speed-density curve and door flow on Juelich trajectories; simulator vs experiment (Improving ML). |
+| `ml_v3.py` | Crossing-time dataset from the calibrated simulator (campus, hospital, random geometries), hybrid model v3, real-data test, conformal ranges, in-the-loop test. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

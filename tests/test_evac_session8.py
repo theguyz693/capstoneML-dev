@@ -14,15 +14,22 @@ from evac import validation as V
 
 def test_imo_tests_pass():
     for t in V.v3_imo():
+        if "IMO 4" in t["test"] and "calibrated" in t["test"]:
+            continue        # design cap 1.33 p/s/m; the calibrated set reproduces lab flows (~1.9) on purpose
         assert t["pass"], t
 
 
-def test_door_flow_is_below_lab_measurements_and_imo_limit():
-    for w, f in V.v1_bottleneck()["sim"]:
+def test_door_flow_vs_lab_measurements():
+    v1 = V.v1_bottleneck()
+    for w, f in v1["sim_sfpe"]:                 # handbook set: conservative, below lab values and the IMO cap
         assert f <= 1.33 * w + 0.02
         lab = dict(V.SEYFRIED).get(w)
         if lab:
             assert f < lab
+    for w, f in v1["sim_juelich"]:              # calibrated set: within 25 % of the lab values
+        lab = dict(V.SEYFRIED).get(w)
+        if lab:
+            assert abs(f - lab) / lab < 0.25, (w, f, lab)
 
 
 def test_field_drill_script():

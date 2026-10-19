@@ -36,7 +36,7 @@ import networkx as nx
 
 from . import config as C
 from .building import exits
-from .physics import weidmann_speed_factor
+from .physics import edge_density, smoke_speed_factor, weidmann_speed_factor
 from .routing import _allowed, _hazard_penalty, congestion_route_table, weight_fn
 
 QP_GAIN_MIN = 0.15          # g_min for unfamiliar pedestrians (Kemloh Wagoum et al. 2012)
@@ -64,8 +64,8 @@ def route_time(G, path, fire_active, step_free, qcount, occ):
         if not _allowed(d, fire_active, step_free):
             return float("inf")
         key = (a, b) if a <= b else (b, a)
-        dens = occ.get(key, 0) / (d["length_m"] * d["width_m"])
-        t = d["length_m"] / (d["free_speed"] * weidmann_speed_factor(dens))
+        dens = edge_density(d, occ.get(key, 0))
+        t = d["length_m"] / (d["free_speed"] * weidmann_speed_factor(dens) * smoke_speed_factor(d.get("hazard", 0.0)))
         total += t * _hazard_penalty(d.get("hazard", 0.0)) + qcount.get((a, b), 0) / d["flow_cap"]
     return total
 
@@ -162,7 +162,7 @@ def casper_plan(G, agents, fire_active):
             if not _allowed(d, fire_active, sf):
                 return None
             key = (u, v) if u <= v else (v, u)
-            walk = d["length_m"] / d["free_speed"]
+            walk = d["length_m"] / (d["free_speed"] * smoke_speed_factor(d.get("hazard", 0.0)))
             return max(walk, (flow[key] + n_s) / d["eff_cap"]) * _hazard_penalty(d.get("hazard", 0.0))
 
         try:

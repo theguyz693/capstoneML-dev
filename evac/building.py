@@ -22,7 +22,7 @@ import math
 import networkx as nx
 
 from . import config as C
-from .physics import sustainable_flow
+from .physics import density_width, sustainable_flow
 
 EXIT_NODES = [
     "north entrance/exit",
@@ -76,18 +76,30 @@ def _attach_physics(G):
             length = max(1.0, d["base_distance"] * C.METERS_PER_UNIT)
             speed = C.FREE_WALK_SPEED
         width = C.WIDTH_M[et]
+        dw = density_width(et, width)
         d.update(
             etype=et,
             vertical=(G.nodes[u]["floor"] != G.nodes[v]["floor"]),
             length_m=round(length, 2),
             width_m=width,
+            dens_width_m=dw,
             flow_cap=C.SPECIFIC_FLOW[et] * width,
             # what the edge can really sustain: door/stair flow rate OR speed-density limit, whichever is lower
-            eff_cap=min(C.SPECIFIC_FLOW[et] * width, sustainable_flow(width, speed)),
-            jam_cap=max(2, int(C.JAM_DENSITY * length * width)),
+            eff_cap=min(C.SPECIFIC_FLOW[et] * width, sustainable_flow(dw, speed)),
+            jam_cap=max(2, int(C.JAM_DENSITY * length * dw)),
             free_speed=speed,
         )
     return G
+
+
+def set_edge_width(d, width_m):
+    """Give one edge a new clear width and recompute its capacities (used for test geometries)."""
+    et = d["etype"]
+    dw = density_width(et, width_m)
+    d.update(width_m=width_m, dens_width_m=dw, flow_cap=C.SPECIFIC_FLOW[et] * width_m,
+             eff_cap=min(C.SPECIFIC_FLOW[et] * width_m, sustainable_flow(dw, d["free_speed"])),
+             jam_cap=max(2, int(C.JAM_DENSITY * d["length_m"] * dw)))
+    return d
 
 
 def build_graph(nodes, edges, floor_height=350, kinds=None):

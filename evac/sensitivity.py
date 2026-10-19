@@ -67,8 +67,9 @@ class Assumptions:
         for k in ("METERS_PER_UNIT", "FREE_WALK_SPEED", "STAIR_DOWN_SPEED", "JAM_DENSITY",
                   "STAIR_FLIGHT_LENGTH_M", "PRE_MOVEMENT_MAX_S"):
             setattr(C, k, v[k])
-        for et in ("corridor", "room_door", "exit_door"):
+        for et in ("room_door", "exit_door"):
             C.SPECIFIC_FLOW[et] = v["DOOR_FLOW"]
+        C.SPECIFIC_FLOW["corridor"] = v.get("CORRIDOR_FLOW", v["DOOR_FLOW"])
         C.SPECIFIC_FLOW["stair"] = v["STAIR_FLOW"]
         for et in C.WIDTH_M:
             C.WIDTH_M[et] = self.saved["WIDTH_M"][et] * v["WIDTH_SCALE"]

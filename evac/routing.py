@@ -23,6 +23,7 @@ gives EVERY node its best path in a single pass.
 import networkx as nx
 from . import config as C
 from .building import exits
+from .physics import smoke_speed_factor
 
 METHODS = ("nearest", "safe_shortest", "ml", "reactive")
 
@@ -77,7 +78,7 @@ def weight_fn(G, method, fire_active, step_free):
     def w(u, v, d):
         if not _allowed(d, fire_active, step_free):
             return None  # networkx: None hides the edge
-        t = d["length_m"] / d["free_speed"]
+        t = d["length_m"] / (d["free_speed"] * smoke_speed_factor(d.get("hazard", 0.0)))
         if method == "nearest":
             return d["length_m"]
         if method == "safe_shortest":
@@ -116,7 +117,7 @@ def congestion_route_table(G, fire_active, step_free, queue_count, occupancy):
     The search runs outward from the exits, so when networkx relaxes u -> v the
     evacuee actually walks v -> u and queues at v.
     """
-    from .physics import weidmann_speed_factor
+    from .physics import weidmann_speed_factor, edge_density
 
     ex = [e for e in exits(G) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE]
     if not ex:
@@ -126,8 +127,8 @@ def congestion_route_table(G, fire_active, step_free, queue_count, occupancy):
         if not _allowed(d, fire_active, step_free):
             return None
         key = (u, v) if u <= v else (v, u)
-        dens = occupancy.get(key, 0) / (d["length_m"] * d["width_m"])
-        t = d["length_m"] / (d["free_speed"] * weidmann_speed_factor(dens))
+        dens = edge_density(d, occupancy.get(key, 0))
+        t = d["length_m"] / (d["free_speed"] * weidmann_speed_factor(dens) * smoke_speed_factor(d.get("hazard", 0.0)))
         wait = queue_count.get((v, u), 0) / d["flow_cap"]
         return t * _hazard_penalty(d.get("hazard", 0.0)) + wait
 

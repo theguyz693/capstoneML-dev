@@ -29,6 +29,7 @@ from collections import defaultdict
 
 from . import config as C
 from .building import exits
+from .physics import smoke_speed_factor
 from .routing import _allowed, _hazard_penalty
 
 
@@ -70,7 +71,7 @@ class Reservations:
 
 
 def _walk_time(d, speed_mult=1.0):
-    return d["length_m"] / (d["free_speed"] * speed_mult)
+    return d["length_m"] / (d["free_speed"] * speed_mult * smoke_speed_factor(d.get("hazard", 0.0)))
 
 
 def _leg(d, speed_mult=1.0, walk=None):
@@ -170,7 +171,8 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
     for a in moving:
         u, v = a.path[a.idx], a.path[a.idx + 1]
         d = G.edges[u, v]
-        remaining = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult)
+        remaining = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult
+                                                         * smoke_speed_factor(d.get("hazard", 0.0)))
         book_path(G, res, a.path[a.idx + 1:], now + remaining, a.speed_mult, getattr(a, "size", 1.0))
 
     # people who ignore guidance are not re-planned, but the planner sees where they are

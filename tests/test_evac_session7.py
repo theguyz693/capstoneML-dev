@@ -26,7 +26,12 @@ F3 = SC["floor3_full_200"]
 
 
 def test_perfect_knowledge_is_unchanged():
-    assert run(G.copy(), F3, "lookahead", 0)[0]["evac_time_last_s"] == 213.0
+    from evac import config as C
+    C.use_params("sfpe")                     # regression value from before the calibration (handbook parameters)
+    try:
+        assert run(load_campus(), F3, "lookahead", 0)[0]["evac_time_last_s"] == 213.0
+    finally:
+        C.use_params("juelich")
 
 
 def test_planner_that_sees_nobody_equals_shortest_path():

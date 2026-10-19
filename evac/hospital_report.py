@@ -229,12 +229,11 @@ def section_ml(A, lines, findings):
         lines.append(f"| {TITLE[s]} | {v['lookahead']:.0f} | {v['lookahead_ml']:.0f} | {v['pred_ml']:.0f} |")
     g = lambda m: A[A.method == m]["amb"].mean()
     dml = (g('lookahead_ml') - g('lookahead')) / g('lookahead')
-    findings.append(("The campus-trained ML model does NOT transfer as-is: " if dml > 0.02 else
-                     "The campus-trained ML model transfers without retraining: ") +
-                    f"look-ahead with ML walk times is {dml:+.1%} vs the formula version on the hospital (ambulatory "
-                    "last-out, all scenarios)" + ("; it never saw ramps, beds or slow patients, so its walk times are "
-                    "off - a learned model must be retrained per building, the formula needs no training. " if dml > 0.02
-                    else ". ") + f"Re-routing on ML predictions alone stays {(g('pred_ml') - g('lookahead')) / g('lookahead'):+.0%} "
+    findings.append(f"ML walk times (model {C.DELAY_MODEL}, trained on the calibrated simulator incl. this building) inside "
+                    f"the capacity planner: {dml:+.1%} vs the formula version on the hospital (ambulatory last-out, all "
+                    "scenarios) - " + ("no real gain: " if dml > -0.02 else "a small gain: ") +
+                    "coordination, not prediction accuracy, drives the result (docs/ml_v3.md). "
+                    f"Re-routing on ML predictions alone stays {(g('pred_ml') - g('lookahead')) / g('lookahead'):+.0%} "
                     "behind coordinated planning - the same pattern as on campus.")
     lines += ["", "(Ambulatory last-out time, seconds, mean of 30 seeds.)", ""]
 

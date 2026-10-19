@@ -97,7 +97,12 @@ def test_ramp_is_a_weakspot_candidate_only_in_the_hospital():
 
 def test_campus_results_unchanged():
     sc = json.load(open(os.path.join(ROOT, "evac", "scenarios.json"), encoding="utf-8"))["floor3_full_200"]
-    assert run(load_campus(), sc, "lookahead", 0)[0]["evac_time_last_s"] == 213.0
+    from evac import config as C
+    C.use_params("sfpe")                     # regression value from before the calibration (handbook parameters)
+    try:
+        assert run(load_campus(), sc, "lookahead", 0)[0]["evac_time_last_s"] == 213.0
+    finally:
+        C.use_params("juelich")
 
 
 if __name__ == "__main__":

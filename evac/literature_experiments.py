@@ -271,13 +271,15 @@ def report(check):
     L += ["", "## What it means", "",
           "- Against the two methods that do not book capacity over time (quickest path, CASPER) look-ahead is "
           "clearly better wherever crowds concentrate, and never significantly worse on campus.",
-          "- CCRP, the published method our planner builds on, is as good as look-ahead in most calm scenarios and "
-          "slightly better in some spreading-fire cases. Look-ahead's advantage over CCRP is robustness: when only "
-          "60% of people follow guidance and others herd, re-planning recovers what a one-shot plan loses. So the "
-          "honest claim is 'CCRP-style booking is the key ingredient; re-planning makes it robust', not "
-          "'look-ahead beats CCRP everywhere'.",
-          "- Hospital fire in the entrance lobby: the capacity-aware planners (CCRP, look-ahead) are slower for the "
-          "walking crowd because they keep people away from the smoke (28 exposed vs 78-99 for the other methods).",
+          "- CCRP, the published method our planner builds on, is as good as look-ahead in calm scenarios (1-2% "
+          "better in two of them). With the calibrated simulator look-ahead is clearly better wherever plans go "
+          "stale: in spreading fires (8-16% faster AND far fewer people in smoke) and when only 60% follow guidance "
+          "and others herd (14% faster). Honest claim: 'CCRP-style booking is the key ingredient; re-planning makes it "
+          "robust to a changing fire and to people who do not follow'.",
+          "- Hospital: CASPER (one route per room, planned once) is faster for the walking crowd in 3 of 6 scenarios "
+          "(13-21%). In the entrance-lobby fire that speed comes from walking more people past the smoke (67 exposed "
+          "vs 28); in the other two it is a genuine weakness of look-ahead in this building, not yet analysed "
+          "(earlier, with handbook parameters, look-ahead won 4 of 6 against CASPER).",
           "- Quickest path, a local method, avoids smoke best in spreading fires (people re-route as soon as they "
           "see the fire) but cannot prevent the stair jams that a global plan avoids.", ""]
     L += ["", "## Campus - time until the last person is out (s)", ""] + block(campus, SCEN_MAIN, CT, "time (s)")

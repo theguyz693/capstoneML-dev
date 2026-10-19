@@ -966,7 +966,7 @@
                 <div class="section-header">
                     <div>
                         <div class="section-title" style="color: var(--accent-orange);">🚨 Evacuation Route</div>
-                        <div class="section-subtitle" id="emSub">Random Forest + Dijkstra Optimization</div>
+                        <div class="section-subtitle" id="emSub">Research engine · ML v3 crossing times · fire- and crowd-aware</div>
                     </div>
                 </div>
 
@@ -981,7 +981,7 @@
                 <select id="mlEmergencyType" onchange="onEmergencyTypeChange()">
                     <option value="normal">Normal — No Emergency</option>
                     <option value="fire" selected>Fire / Hazard</option>
-                    <option value="crowd" id="optCrowd">Crowd Congestion</option>
+                    <option value="crowd" id="optCrowd">Crowd Only (no fire)</option>
                     <option value="accessibility">Accessibility / Mobility-Impaired</option>
                     <option value="multifloor_fire">Multi-Floor: Stairwell Blocked</option>
                 </select>
@@ -1006,23 +1006,17 @@
                     </div>
                 </div>
 
-                <!-- 4. CROWD sub-panel -->
-                <div id="crowdSub" class="ml-subpanel">
-                    <label>Crowd Hotspot (node)</label>
-                    <select id="mlCrowdNode">
-                        <option value="">Loading junctions…</option>
+                <!-- 4. CROWD sub-panel: other people evacuating at the same time (simulated crowd snapshot) -->
+                <div id="crowdSub" class="ml-subpanel visible">
+                    <label>Other people evacuating</label>
+                    <select id="mlCrowdScenario">
+                        <option value="">None (empty building)</option>
                     </select>
-                    <label>Crowd Intensity</label>
+                    <label>Crowd as it is … seconds after the alarm</label>
                     <div class="slider-row">
-                        <input type="range" id="mlCrowdIntensity" min="0" max="1" step="0.05" value="0.95"
-                            oninput="document.getElementById('mlCrowdIntensityVal').textContent = parseFloat(this.value).toFixed(2);">
-                        <span class="slider-val" id="mlCrowdIntensityVal">0.95</span>
-                    </div>
-                    <label>Crowd Radius (graph units)</label>
-                    <div class="slider-row">
-                        <input type="range" id="mlCrowdRadius" min="50" max="1000" step="10" value="300"
-                            oninput="document.getElementById('mlCrowdRadiusVal').textContent = this.value;">
-                        <span class="slider-val" id="mlCrowdRadiusVal">300</span>
+                        <input type="range" id="mlCrowdAt" min="0" max="300" step="10" value="40"
+                            oninput="document.getElementById('mlCrowdAtVal').textContent = this.value + ' s';">
+                        <span class="slider-val" id="mlCrowdAtVal">40 s</span>
                     </div>
                 </div>
 
@@ -1032,20 +1026,21 @@
                     <input type="checkbox" id="mlMobility">
                 </div>
 
-                <button class="ml-btn" onclick="runMLEvacuation()" id="mlBtn">⚡ Simulate ML Evacuation</button>
-                <div id="mlSpinner">⏳ Calculating ML route…</div>
+                <button class="ml-btn" onclick="runMLEvacuation()" id="mlBtn">⚡ Find Evacuation Route</button>
+                <div id="mlSpinner">⏳ Predicting crossing times…</div>
+                <div class="muted-note" style="margin-top:4px">Research engine + ML v3: corridor/stair times predicted by a model trained on a simulator calibrated to real crowd experiments; burning corridors closed, smoke avoided.</div>
                 <div id="mlStatus"></div>
 
                 <div id="mlMetrics">
                     <div class="metric-row"><span class="label">Recommended Exit</span><span id="mExit">—</span></div>
                     <div class="metric-row"><span class="label">Physical Dist</span><span id="mDist">—</span></div>
-                    <div class="metric-row"><span class="label">ML Cost</span><span id="mCost">—</span></div>
+                    <div class="metric-row"><span class="label">Time to exit (ML)</span><span id="mCost">—</span></div>
                     <div class="metric-row"><span class="label">Peak Hazard</span><span id="mHazard">—</span></div>
-                    <div class="metric-row"><span class="label">Avg Crowd</span><span id="mCrowd">—</span></div>
+                    <div class="metric-row"><span class="label">Crowd</span><span id="mCrowd">—</span></div>
                     <div class="metric-row"><span class="label">Path Changed</span><span id="mChanged">—</span></div>
                     <div class="metric-row echo"><span class="label">↳ Origin used</span><span id="mOriginUsed" style="color:#a5f3fc;">—</span></div>
                     <div class="metric-row"><span class="label">↳ Hazard node</span><span id="mHazardUsed" style="color:#fca5a5;">—</span></div>
-                    <div class="metric-row"><span class="label">↳ Crowd node</span><span id="mCrowdUsed" style="color:#fde68a;">—</span></div>
+                    <div class="metric-row"><span class="label">↳ Crowd</span><span id="mCrowdUsed" style="color:#fde68a;">—</span></div>
                     <div class="metric-row"><span class="label">↳ Mobility impaired</span><span id="mMobilityUsed">—</span></div>
                     <div class="route-seq" id="mRoute"></div>
                 </div>
@@ -2361,8 +2356,7 @@
             const type = document.getElementById('mlEmergencyType').value;
             document.getElementById('fireSub').classList.toggle('visible',
                 type === 'fire' || type === 'multifloor_fire');
-            document.getElementById('crowdSub').classList.toggle('visible',
-                type === 'crowd');
+            document.getElementById('crowdSub').classList.toggle('visible', type !== 'normal');
             if (type === 'accessibility') {
                 document.getElementById('mlMobility').checked = true;
             }
@@ -2425,7 +2419,8 @@
                     }
                 });
 
-                ['mlHazardNode', 'simHazardNode', 'mlCrowdNode'].forEach(selId => {
+                loadCrowdScenarios();
+                ['mlHazardNode', 'simHazardNode'].forEach(selId => {
                     const sel = document.getElementById(selId);
                     if (!sel) return;
                     sel.innerHTML = '';
@@ -2717,126 +2712,34 @@
             ctx.restore();
         }
 
-        // --- MAIN ML EVACUATION CALL (STATIC EMERGENCY PANEL ONLY) ---
-        async function runMLEvacuation() {
-            if (IS_HOSPITAL) return runHospitalRoute();
-            const origin        = document.getElementById('mlOrigin').value.trim();
-            const emergencyType = document.getElementById('mlEmergencyType').value;
-            const hazardNode    = document.getElementById('mlHazardNode').value.trim();
-            const hazardIntens  = parseFloat(document.getElementById('mlHazardIntensity').value);
-            const hazardRadius  = parseFloat(document.getElementById('mlHazardRadius').value);
-            const crowdNode     = document.getElementById('mlCrowdNode').value.trim();
-            const crowdIntens   = parseFloat(document.getElementById('mlCrowdIntensity').value);
-            const crowdRadius   = parseFloat(document.getElementById('mlCrowdRadius').value);
-            const mobilityImp   = document.getElementById('mlMobility').checked;
-            const isMultiFloor  = origin.startsWith('f') || emergencyType === 'accessibility' || emergencyType === 'multifloor_fire';
-
-            if (!origin) { alert('Please select an origin node.'); return null; }
-
-            const payload = {
-                origin,
-                emergency_type:   emergencyType,
-                hazard_node:      (emergencyType === 'fire' || emergencyType === 'multifloor_fire') ? hazardNode : null,
-                hazard_intensity: hazardIntens,
-                hazard_radius:    hazardRadius,
-                crowd_node:       emergencyType === 'crowd' ? crowdNode : null,
-                crowd_intensity:  crowdIntens,
-                crowd_radius:     crowdRadius,
-                mobility_impaired: mobilityImp,
-                multi_floor:      isMultiFloor,
-            };
-
-            document.getElementById('mlBtn').disabled = true;
-            document.getElementById('mlSpinner').style.display = 'block';
-            document.getElementById('mlMetrics').style.display = 'none';
-            document.getElementById('mlStatus').style.display = 'none';
-            clearMLVisuals();
-
-            let data;
+        // --- EVACUATION ROUTE (research engine + ML v3, both buildings) ---
+        // The old campus route (/api/evacuate in server.py, Random Forest "v1") is retired from the dashboard:
+        // it learned a hand-written formula. Routes now come from evac/api.py /api/research/route.
+        async function loadCrowdScenarios() {
+            const sel = document.getElementById('mlCrowdScenario');
+            if (!sel) return;
             try {
-                const resp = await fetch('/api/evacuate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!resp.ok) {
-                    const err = await resp.json();
-                    throw new Error(err.detail || 'Server error');
+                const resp = await fetch('/api/research/scenarios?building=' + (IS_HOSPITAL ? 'hospital' : 'campus'));
+                if (!resp.ok) return;
+                const sc = await resp.json();
+                for (const [name, s] of Object.entries(sc)) {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name.replace(/_/g, ' ') + (s.n_agents ? ` (${s.n_agents} people)` : '');
+                    sel.appendChild(opt);
                 }
-                data = await resp.json();
-                window.currentMLRouteData = data;
-            } catch (e) {
-                alert('ML Routing Error: ' + e.message);
-                document.getElementById('mlBtn').disabled = false;
-                document.getElementById('mlSpinner').style.display = 'none';
-                return null;
-            }
-
-            document.getElementById('mlBtn').disabled = false;
-            document.getElementById('mlSpinner').style.display = 'none';
-
-            if (data.hazard_zone_node && data.hazard_zone_radius) {
-                drawHazardZone(data.hazard_zone_node, data.hazard_zone_radius);
-            }
-            if (data.path_changed_from_baseline && data.baseline_route && data.baseline_route.length > 1) {
-                drawBaselineRoute(data.baseline_route);
-            }
-            drawEmergencyPaths([{ path: data.primary_route, id: data.recommended_exit, dist: data.ml_cost }]);
-            animateCameraToPath(data.primary_route);
-
-            const isSafe = data.status === 'SAFE';
-            document.getElementById('mExit').textContent    = data.recommended_exit;
-            document.getElementById('mDist').textContent    = data.physical_distance.toFixed(1) + ' px';
-            document.getElementById('mCost').textContent    = data.ml_cost.toFixed(2);
-            document.getElementById('mHazard').textContent  = (data.peak_hazard * 100).toFixed(1) + '%';
-            document.getElementById('mCrowd').textContent   = (data.average_crowd * 100).toFixed(1) + '%';
-            document.getElementById('mChanged').textContent = data.path_changed_from_baseline ? 'YES — Rerouted!' : 'No (same as baseline)';
-            document.getElementById('mChanged').style.color = data.path_changed_from_baseline ? '#fb923c' : '#94a3b8';
-            document.getElementById('mOriginUsed').textContent  = data.origin || origin;
-            document.getElementById('mHazardUsed').textContent  = data.hazard_node || 'none';
-            document.getElementById('mCrowdUsed').textContent   = data.crowd_node  || 'none';
-            document.getElementById('mMobilityUsed').textContent= data.mobility_impaired ? 'Yes' : 'No';
-            document.getElementById('mRoute').innerHTML = '<b>ML Route:</b> ' + data.primary_route.join(' &rarr; ');
-
-            const statusEl = document.getElementById('mlStatus');
-            statusEl.textContent   = isSafe ? '✓ SAFE EVACUATION ROUTE' : '⚠️ DANGER — CHECK ROUTE';
-            statusEl.className     = isSafe ? 'status-safe' : 'status-danger';
-            statusEl.style.display = 'block';
-            document.getElementById('mlMetrics').style.display = 'block';
-
-            document.getElementById('pathInfo').innerHTML =
-                `<span style="color:#4ade80; font-weight:bold;">ML Exit: ${data.recommended_exit}</span><br>`
-                + `<span style="font-size:0.85em; color:#94a3b8;">Emergency: ${data.emergency_type}</span>`;
-
-            const badge = document.getElementById('platformStatusBadge');
-            const badgeText = document.getElementById('platformStatusText');
-            badge.className = isSafe ? 'status-badge alert-active' : 'status-badge alert-active';
-            badgeText.innerText = `EMERGENCY ALERT — EXIT: ${data.recommended_exit.toUpperCase()}`;
-
-            if (data.floor_segments && data.floor_segments.length > 0) {
-                render2DFloorPlans(data.floor_segments);
-            }
-            addLog(`ML route ${data.origin || origin} → <b>${data.recommended_exit}</b>${data.path_changed_from_baseline ? ' (rerouted)' : ''}`, 'var(--accent-orange)');
-
-            return data;
+            } catch (e) { /* research engine not running: the select stays at 'None' */ }
         }
 
-        // Hospital: safe-shortest route from the research engine (evac/api.py, served by research_server.py)
-        async function signsCall(body) {
-            const resp = await fetch('/api/research/signs', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-            });
-            if (!resp.ok) throw new Error(resp.status === 404 ? 'not found' : ('HTTP ' + resp.status));
-            return resp.json();
-        }
-
-        async function runHospitalRoute() {
+        async function runMLEvacuation() {
             const origin   = document.getElementById('mlOrigin').value.trim();
             const type     = document.getElementById('mlEmergencyType').value;
             const fireOn   = (type === 'fire' || type === 'multifloor_fire');
             const hazard   = document.getElementById('mlHazardNode').value.trim();
             const radius   = parseFloat(document.getElementById('mlHazardRadius').value);
             const stepFree = document.getElementById('mlMobility').checked || type === 'accessibility';
+            const crowdSc  = type === 'normal' ? '' : document.getElementById('mlCrowdScenario').value;
+            const crowdAt  = parseFloat(document.getElementById('mlCrowdAt').value);
             if (!origin) { showToast('Pick an origin room first'); return null; }
 
             const btn = document.getElementById('mlBtn');
@@ -2847,43 +2750,48 @@
             clearMLVisuals();
             close2DTray();
 
-            let res, base;
+            let r;
             try {
-                [res, base] = await Promise.all([
-                    signsCall({ building: 'hospital', fire_node: fireOn ? hazard : null, fire_radius: radius, step_free: stepFree, kiosk_node: origin }),
-                    signsCall({ building: 'hospital', fire_node: null, step_free: stepFree, kiosk_node: origin }),
-                ]);
+                const resp = await fetch('/api/research/route', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ building: IS_HOSPITAL ? 'hospital' : 'campus', origin,
+                        fire_node: fireOn ? hazard : null, fire_radius: radius, step_free: stepFree,
+                        crowd_scenario: crowdSc || null, at_s: crowdAt })
+                });
+                if (!resp.ok) {
+                    let msg = 'HTTP ' + resp.status;
+                    try { msg = (await resp.json()).detail || msg; } catch (e) {}
+                    throw new Error(msg);
+                }
+                r = await resp.json();
+                window.currentMLRouteData = r;
             } catch (e) {
                 btn.disabled = false;
                 document.getElementById('mlSpinner').style.display = 'none';
                 const st = document.getElementById('mlStatus');
                 st.className = 'status-danger';
-                st.innerHTML = 'Hospital routing needs the research engine.<br><span style="font-weight:400">Start the dashboard with <code>python research_server.py</code></span>';
+                st.innerHTML = 'Routing needs the research engine.<br><span style="font-weight:400">Start the dashboard with <code>python research_server.py</code> (' + e.message + ')</span>';
                 st.style.display = 'block';
                 return null;
             }
             btn.disabled = false;
             document.getElementById('mlSpinner').style.display = 'none';
 
-            const k = res.kiosk || {};
-            const path = k.path;
-            const basePath = base.kiosk && base.kiosk.path;
+            const path = r.path, basePath = r.baseline_path;
             if (fireOn && hazard) drawHazardZone(hazard, radius);
-
             const statusEl = document.getElementById('mlStatus');
             if (!path) {
                 statusEl.className = 'status-danger';
-                statusEl.textContent = '⚠️ ' + (k.message || 'No safe route');
+                statusEl.textContent = '⚠️ ' + r.message;
                 statusEl.style.display = 'block';
                 document.getElementById('platformStatusText').innerText = 'NO SAFE ROUTE — DEFEND IN PLACE';
                 document.getElementById('platformStatusBadge').className = 'status-badge alert-active';
                 addLog(`No safe route from ${origin}`, 'var(--accent-red)');
-                return res;
+                return r;
             }
-
             const changed = !!basePath && basePath.join('|') !== path.join('|');
             if (changed && basePath.length > 1) drawBaselineRoute(basePath);
-            drawEmergencyPaths([{ path: path, id: k.exit, dist: 0 }]);
+            drawEmergencyPaths([{ path: path, id: r.exit, dist: r.eta_s }]);
             animateCameraToPath(path);
 
             let len = 0;
@@ -2891,28 +2799,35 @@
                 const a = campusData.nodes[path[i - 1]], b = campusData.nodes[path[i]];
                 if (a && b) len += Math.hypot(a.x - b.x, a.y - b.y);
             }
-            const peak = Math.max(0, ...path.map(n => (res.hazard && res.hazard[n]) || 0));
-            document.getElementById('mExit').textContent    = k.exit;
+            const fmt = s => s >= 90 ? (s / 60).toFixed(1) + ' min' : Math.round(s) + ' s';
+            const eta = (r.eta_lo_s != null) ? `${fmt(r.eta_s)} (${fmt(r.eta_lo_s)}–${fmt(r.eta_hi_s)})` : fmt(r.eta_s);
+            const peak = r.peak_hazard || 0;
+            document.getElementById('mExit').textContent    = r.exit;
             document.getElementById('mDist').textContent    = Math.round(len) + ' px';
-            document.getElementById('mCost').textContent    = (path.length - 1) + ' steps';
+            document.getElementById('mCost').textContent    = eta;
             document.getElementById('mHazard').textContent  = (peak * 100).toFixed(1) + '%';
-            document.getElementById('mCrowd').textContent   = 'see Research Lab';
-            document.getElementById('mChanged').textContent = changed ? 'YES — avoids the fire' : 'No (same as no-fire route)';
+            document.getElementById('mCrowd').textContent   = r.crowd ? `${r.crowd.people_inside} still inside` : 'empty building';
+            document.getElementById('mChanged').textContent = changed ? 'YES — avoids smoke / crowd' : 'No (same as shortest safe path)';
             document.getElementById('mChanged').style.color = changed ? '#fb923c' : '#94a3b8';
             document.getElementById('mOriginUsed').textContent  = origin;
             document.getElementById('mHazardUsed').textContent  = fireOn ? hazard : 'none';
-            document.getElementById('mCrowdUsed').textContent   = 'n/a';
-            document.getElementById('mMobilityUsed').textContent = stepFree ? 'Yes (ramp / no stairs)' : 'No';
-            document.getElementById('mRoute').innerHTML = `<b>Sign says:</b> ${k.message}<br><br><b>Route:</b> ` + path.join(' &rarr; ');
+            document.getElementById('mCrowdUsed').textContent   = r.crowd ? `${r.crowd.scenario.replace(/_/g, ' ')} @ ${r.crowd.at_s} s` : 'none';
+            document.getElementById('mMobilityUsed').textContent = stepFree ? 'Yes (no stairs)' : 'No';
+            const slow = (r.legs || []).filter(l => l.pred_s >= 15).map(l => `${l.from} → ${l.to} ~${Math.round(l.pred_s)} s`);
+            document.getElementById('mRoute').innerHTML = `<b>Sign says:</b> ${r.message}<br><br><b>Route:</b> ` + path.join(' &rarr; ')
+                + (slow.length ? `<br><br><b>Slow parts (predicted):</b> ` + slow.join('; ') : '');
 
             statusEl.className = peak > 0 ? 'status-danger' : 'status-safe';
             statusEl.textContent = peak > 0 ? '⚠️ ROUTE PASSES NEAR SMOKE — CHECK' : '✓ SAFE EVACUATION ROUTE';
             statusEl.style.display = 'block';
             document.getElementById('mlMetrics').style.display = 'block';
             document.getElementById('platformStatusBadge').className = 'status-badge alert-active';
-            document.getElementById('platformStatusText').innerText = `EMERGENCY ALERT — EXIT: ${k.exit.replace(/^g_/, '').toUpperCase()}`;
-            addLog(`Route ${origin} → <b>${k.exit}</b>${changed ? ' (avoids fire)' : ''}`, 'var(--accent-orange)');
-            return res;
+            document.getElementById('platformStatusText').innerText = `EMERGENCY ALERT — EXIT: ${r.exit.replace(/^g_/, '').toUpperCase()}`;
+            document.getElementById('pathInfo').innerHTML =
+                `<span style="color:#4ade80; font-weight:bold;">Exit: ${r.exit}</span><br>`
+                + `<span style="font-size:0.85em; color:#94a3b8;">About ${eta} to get out</span>`;
+            addLog(`Route ${origin} → <b>${r.exit}</b>, ~${fmt(r.eta_s)}${changed ? ' (rerouted)' : ''}`, 'var(--accent-orange)');
+            return r;
         }
 
         // --- 7. EMERGENCY ROUTING VISUALIZATION (STATIC DIJKSTRA) ---
@@ -3216,11 +3131,8 @@
             const opt = document.getElementById('optAllFloors');
             if (opt) opt.textContent = `Building-wide (all ${FLOORS.length} floors)`;
             if (IS_HOSPITAL) {
-                document.getElementById('emSub').textContent = 'Research engine · safe shortest path, fire- and step-free-aware';
-                const oc = document.getElementById('optCrowd');
-                if (oc) oc.remove();
+                document.getElementById('emSub').textContent = 'Research engine · ML v3 crossing times · fire-, crowd- and step-free-aware';
                 document.getElementById('mlBtn').textContent = '⚡ Find Evacuation Route';
-                document.getElementById('mCost').previousElementSibling.textContent = 'Route length';
                 const hi = document.getElementById('mlHazardIntensity');
                 if (hi) { hi.closest('.slider-row').style.display = 'none'; hi.closest('.slider-row').previousElementSibling.style.display = 'none'; }
             }

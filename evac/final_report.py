@@ -365,14 +365,19 @@ def section_ga(A, Cdf, D, lines, findings):
         if la_t:
             rel.append((la_t - r.evac_time_last_s) / r.evac_time_last_s)
     if rel:
-        parts = []
+        parts, ga_better = [], []
         for sc in dict.fromkeys(Cdf.scenario):
             g = Cdf[Cdf.scenario == sc]
             la = A[(A.scenario == sc) & (A.method == "lookahead") & A.seed.isin(g.seed)]["last"].mean()
-            parts.append(f"{TITLE[sc]} GA {g.evac_time_last_s.mean():.0f} s vs look-ahead {la:.0f} s")
+            ga = g.evac_time_last_s.mean()
+            parts.append(f"{TITLE[sc]} GA {ga:.0f} s vs look-ahead {la:.0f} s")
+            if ga < la * 0.98:
+                ga_better.append(TITLE[sc])
+        verdict = ("beat look-ahead only in: " + ", ".join(ga_better)) if ga_better else "never beat look-ahead"
         findings.append(f"A genetic algorithm with {int(Cdf.ga_evaluations.max())} full simulations per case "
-                        f"(~{Cdf.compute_s.mean() / 60:.0f} min, offline) only matched look-ahead (~2 s, live) in the "
-                        "seminar hall: " + "; ".join(parts) + ". Optimising exit choice alone cannot balance stairwells.")
+                        f"(~{Cdf.compute_s.mean() / 60:.0f} min, offline) {verdict} (look-ahead: ~2 s, live): "
+                        + "; ".join(parts) + ". Optimising exit choice alone cannot balance stairwells; in a single "
+                        "hall with several doors it can, but only offline.")
     lines += ["", "Why the GA can lose badly on a full floor: its genome chooses only the EXIT for each group of people; "
               "the route to that exit (and so the stairwell) is still the shortest one, and everyone leaves as soon as "
               "they are ready. Look-ahead chooses the whole route and, through capacity booking, the timing. When the "
@@ -527,21 +532,24 @@ def section_ablation(H, lines, findings):
 
 LIMITATIONS = """## Limitations (stated openly)
 
-1. **Simulated, not observed.** All results come from our own discrete-time simulator. Its flow model (Weidmann
-   speed-density, SFPE-style specific flows) is standard and passes the verification tests in `docs/verification`,
-   but it has not been calibrated against a real drill in this building. Absolute times are therefore not
-   predictions; the *ranking* of methods is what the sensitivity analysis shows to be robust.
-2. **One building geometry (plus the hospital to come).** The framework is building-agnostic (`build_graph`), but
-   the experiments here use the campus building only.
+1. **Simulated, not observed in this building.** All results come from our own discrete-time simulator. Its
+   speed-density curve and door flow are CALIBRATED on real Juelich crowd experiments (`docs/calibration.md`),
+   but those were students in a laboratory, and no drill has been timed in this building. Absolute times are
+   therefore estimates; the *ranking* of methods is what the sensitivity analysis and both parameter sets
+   (calibrated and handbook, `docs/archive_handbook_params/`) show to be robust.
+2. **Two building geometries.** The framework is building-agnostic (`build_graph`); this report covers the
+   campus, `docs/hospital_results.md` the hospital.
 3. **Agents are simple.** No group behaviour beyond herding toward the crowd, no counter-flow of responders, no
    panic model, no physical pushing; compliance is a fixed probability per person.
 4. **Fire and smoke are geometric.** Fire spreads as a growing radius and smoke climbs stair shafts on a timer;
-   there is no CFD smoke model (e.g. FDS). Exposure = entering a node above the hazard threshold.
+   there is no CFD smoke model (e.g. FDS). Exposure = entering a node above the hazard threshold. Smoke slows
+   walking (Frantzich & Nilsson 2003), but the mapping from our 0-1 hazard index to smoke density is assumed.
 5. **Perfect sensing is assumed** for the planner (it knows everyone's position at each re-plan). Section 6 tests
    *staleness* of that data but not noise or missing counts.
 6. **Lifts** are used only for step-free users without fire; lift dispatching is not modelled in detail.
-7. **The ML delay model is trained on the same simulator** it is evaluated in. Its value is shown relative to
-   a textbook formula on held-out scenarios, not on real sensor data.
+7. **The ML delay model (v3) is trained on simulated crossings.** It is tested on real Juelich crossings
+   (`docs/ml_v3.md`): about as accurate as the calibrated formula overall, better in queues, and its uncertainty
+   range needed widening on real data. It has not been tested on real sensor data from a building.
 8. **The theoretical lower bound** relaxes walking speeds to free-flow and discretises time (2 s steps), so it is
    a bound, not an achievable plan.
 """
@@ -568,10 +576,13 @@ def main():
     n_runs = sum(len(x) for x in (A, B, Cdf, D, E, G_, H) if x is not None)
     head = ["# Final results", "",
             f"Generated by `python -m evac.final_report` from {n_runs} simulation runs in `results/final_*.csv`. "
-            "Every number below can be regenerated with `python -m evac.final_experiments` (seeded, deterministic).",
+            "Every number below can be regenerated with `python -m evac.final_experiments` (seeded, deterministic). "
+            "Simulator parameters: CALIBRATED on Juelich experiments, smoke slows walking (Improving-ML session; "
+            "`docs/calibration.md`); ML predictor = v3 (`docs/ml_v3.md`). Results with the earlier handbook values: "
+            "`docs/archive_handbook_params/final_results.md`.",
             "", "## Key findings", ""] + [f"{i}. {f}" for i, f in enumerate(findings, 1)] + [
-            "", "Related analyses: [ML study](ml_study.md) (model comparison, learning curve, SHAP, conformal "
-            "intervals), [sensitivity](sensitivity.md) (robustness to physical assumptions), "
+            "", "Related analyses: [calibration](calibration.md) (fit to real crowd data), [ML v3](ml_v3.md) "
+            "(the learned crossing-time model, tested on real data), [sensitivity](sensitivity.md) (robustness to physical assumptions), "
             "[tuning](tuning.md) (Bayesian optimisation of planner settings), [weak spots](weakspots.md).", ""]
     with open(DOC, "w", encoding="utf-8") as f:
         f.write("\n".join(head + lines + [LIMITATIONS]))

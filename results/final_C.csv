@@ -1,7 +1,7 @@
 part,tag,scenario,method,seed,evac_time_last_s,evac_time_mean_s,exposed_agents,route_changes,ga_evaluations,compute_s
-C,ga,lecture_hall_f1_120,ga,0,210.5,136.3,0,0,721,146.2
-C,ga,lecture_hall_f1_120,ga,1,212.0,132.5,0,0,721,143.6
-C,ga,floor3_full_200,ga,0,346.0,203.1,0,0,721,264.7
-C,ga,floor3_full_200,ga,1,357.5,201.9,0,0,721,266.2
-C,ga,crowd_250_fire_j19,ga,0,321.0,170.4,1,0,721,269.2
-C,ga,crowd_250_fire_j19,ga,1,247.0,146.4,0,0,721,231.6
+C,ga,lecture_hall_f1_120,ga,0,179.5,126.2,0,0,721,151.0
+C,ga,lecture_hall_f1_120,ga,1,171.5,127.5,0,0,721,145.0
+C,ga,floor3_full_200,ga,0,351.5,197.0,0,0,721,290.4
+C,ga,floor3_full_200,ga,1,384.0,198.9,0,0,721,308.9
+C,ga,crowd_250_fire_j19,ga,0,360.0,174.1,1,0,721,311.9
+C,ga,crowd_250_fire_j19,ga,1,244.5,137.0,0,0,721,252.0
