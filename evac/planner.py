@@ -85,7 +85,98 @@ def _leg(d, speed_mult=1.0, walk=None):
     return t * (1.0 + w * (_hazard_penalty(h) - 1.0)) + extra
 
 
+class _Fast:
+    """Per-plan cache (Phase 2, scalability): adjacency lists with each edge's static cost parts and capacity,
+    and an A* lower bound (free-flow generalised time to the nearest exit). Built once per plan/re-plan, while
+    the hazard field is fixed. Same optimal costs as the plain search, far fewer nodes expanded."""
+
+    def __init__(self, G, fire_active):
+        w = C.SAFETY_WEIGHT
+        self.adj = {u: [] for u in G}
+        for u, v, d in G.edges(data=True):
+            h = d.get("hazard", 0.0)
+            A = _walk_time(d, 1.0) * (1.0 + w * (_hazard_penalty(h) - 1.0))
+            B = w * C.HAZARD_DETOUR_PENALTY_S if h >= C.HAZARD_EXPOSURE else 0.0
+            cap = d["eff_cap"] if C.PLANNER_USE_SUSTAINABLE_CAP else d["flow_cap"]
+            c = max(1, int(cap * C.SLOT_S))
+            ok = (_allowed(d, fire_active, False), _allowed(d, fire_active, True))
+            self.adj[u].append((v, d, A, B, c, ok))
+            self.adj[v].append((u, d, A, B, c, ok))
+        self.exits = {e for e in exits(G) if G.nodes[e].get("hazard", 0.0) < C.HAZARD_IMPASSABLE}
+        self.h = {}
+        for sf in (False, True):
+            dist = {e: 0.0 for e in self.exits}
+            pq = [(0.0, e) for e in self.exits]
+            heapq.heapify(pq)
+            while pq:
+                t, u = heapq.heappop(pq)
+                if t > dist.get(u, math.inf):
+                    continue
+                for v, _d, A, B, _c, ok in self.adj[u]:
+                    if ok[sf] and t + A + B < dist.get(v, math.inf):
+                        dist[v] = t + A + B
+                        heapq.heappush(pq, (t + A + B, v))
+            self.h[sf] = dist
+
+
 def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0, w=1.0):
+    """
+    Time-dependent A* on 'generalised time' (walking time x hazard penalty + waiting for a free slot).
+    Returns (path, arrival_cost, [(u, v, entry_time), ...]) or (None, inf, []).
+    Same result as the plain Dijkstra (_earliest_route_ref): the lower bound only skips nodes that cannot be
+    on a faster route.
+    """
+    key = ("fast", fire_active, C.SAFETY_WEIGHT)
+    fast = res.__dict__.get("_fast")
+    if fast is None or fast[0] != key:
+        fast = (key, _Fast(G, fire_active))
+        res._fast = fast
+    F = fast[1]
+    if res.walk:                                  # learned walking times: no admissible bound, plain Dijkstra
+        return _earliest_route_ref(G, res, source, t0, fire_active, step_free, speed_mult, w)
+    hmap = F.h[step_free]
+    if source not in hmap:
+        return None, math.inf, []
+    scale = min(1.0, 1.0 / speed_mult)            # true cost >= A/speed + B >= scale * (A + B)
+    inv = 1.0 / speed_mult
+    book, horizon_end, S = res.book, res.now + res.horizon, C.SLOT_S
+    best = {source: t0}
+    prev, entry = {}, {}
+    pq = [(t0 + scale * hmap[source], t0, source)]
+    while pq:
+        _f, t, u = heapq.heappop(pq)
+        if t > best.get(u, math.inf):
+            continue
+        if u in F.exits:
+            path, legs, n = [u], [], u
+            while n != source:
+                p = prev[n]
+                legs.append((p, n, entry[n]))
+                path.append(p)
+                n = p
+            return path[::-1], t, legs[::-1]
+        for v, d, A, B, c, ok in F.adj[u]:
+            if not ok[step_free] or v not in hmap:
+                continue
+            s = int(math.floor(t / S + 1e-9))          # earliest slot with room (Reservations.entry_time, inlined)
+            while True:
+                if s * S > horizon_end:
+                    break
+                b = book.get((u, v, s), 0)
+                if b + w <= c or b == 0:
+                    break
+                s += 1
+            te = max(t, s * S)
+            tv = te + A * inv + B
+            if tv < best.get(v, math.inf):
+                best[v] = tv
+                prev[v] = u
+                entry[v] = te
+                heapq.heappush(pq, (tv + scale * hmap[v], tv, v))
+    return None, math.inf, []
+
+
+def _earliest_route_ref(G, res, source, t0, fire_active, step_free, speed_mult=1.0, w=1.0):
     """
     Time-dependent Dijkstra on 'generalised time' (walking time x hazard penalty + waiting).
     Returns (path, arrival_cost, [(u, v, entry_time), ...]) or (None, inf, []).

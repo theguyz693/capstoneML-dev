@@ -112,6 +112,7 @@ python tests/test_evac_improving_ml.py
 python -m evac.safety_tradeoff      # 1. safety-vs-speed dial (config.SAFETY_WEIGHT) swept vs all methods -> docs/safety_tradeoff.md
 python -m evac.eta_study           # 2. time-to-exit estimates checked on 130k simulated predictions -> docs/eta_study.md
 python -m evac.priority_study      # 3. vulnerable people first (planner / queue priority) -> docs/priority.md
+python -m evac.scalability         # 4. re-plan time vs building size and crowd (real buildings + towers) -> docs/scalability.md
 python tests/test_evac_phase2.py
 ```
 Time-to-exit ranges on the dashboard route and kiosk signs are calibrated per band of predicted time
@@ -153,6 +154,7 @@ Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/researc
 | `safety_tradeoff.py` | Safety-vs-speed curve of the planner (SAFETY_WEIGHT 0-8) with every other method as a point (Phase 2). |
 | `eta_study.py` | How good is "about X min to get out"? ML sum vs planner bookings vs actual, conformal ranges (Phase 2). |
 | `priority_study.py` | Vulnerable-first planning (config.PRIORITY_VULNERABLE) and queue priority: who gains, who pays (Phase 2). |
+| `scalability.py` | Planner compute time vs building size and crowd, incl. generated towers up to 20 floors (Phase 2). The planner's route search is A* (`planner._Fast`), same results as before, ~5x faster. |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

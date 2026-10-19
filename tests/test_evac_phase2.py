@@ -66,6 +66,27 @@ def test_priority_switches_are_off_by_default_and_change_order():
         C.PRIORITY_VULNERABLE = False
 
 
+def test_astar_planner_gives_same_results_as_plain_search():
+    from evac import planner
+    G = load_campus()
+    sc = SC["building_250_spreading_fire_j19"]
+    fast = [run(G.copy(), sc, "lookahead", s)[0]["evac_time_last_s"] for s in (0, 1)]
+    orig = planner.earliest_route
+    planner.earliest_route = planner._earliest_route_ref
+    try:
+        ref = [run(G.copy(), sc, "lookahead", s)[0]["evac_time_last_s"] for s in (0, 1)]
+    finally:
+        planner.earliest_route = orig
+    assert fast == ref
+
+
+def test_tower_generator():
+    from evac.scalability import tower
+    from evac.building import room_nodes, unreachable_nodes
+    G = tower(3, 4)
+    assert len(room_nodes(G)) == 3 * 16 and not unreachable_nodes(G)
+
+
 if __name__ == "__main__":
     fns = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for f in fns:
