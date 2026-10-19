@@ -123,6 +123,8 @@ HERDING = 0.0                 # chance a non-compliant person copies the majorit
 FAMILIAR_EXIT = "north main entrance"   # where non-compliant people head by default (the way they came in)
 
 # ---------------------------------------------------------------- spreading fire (Session 4)
+JAM_QUEUE = 10                # a 'jam' = at least this many people waiting at one node ...
+JAM_MIN_S = 10.0              # ... for at least this many seconds in total (secondary-jam study, evac/jam_study.py)
 HAZARD_UPDATE_S = 10.0        # recompute the hazard field this often when a fire spreads
 STAIR_SMOKE_DELAY_S = 30.0    # in a spreading fire, smoke needs ~30 s per floor to climb a stair shaft
 

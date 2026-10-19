@@ -367,6 +367,9 @@ def run(G, scenario, method, seed):
     moving = []
     max_queue, max_queue_node = 0, None
     node_peak = defaultdict(int)          # longest queue seen at each node (jam points)
+    jam_s = defaultdict(float)            # seconds each node had a queue of >= JAM_QUEUE people (evac/jam_study.py)
+    wait_ps = defaultdict(float)          # person-seconds of waiting at each node
+    jam_small_s = defaultdict(float)
     peak_density = 0.0
 
     def _join(a, node, now):
@@ -545,6 +548,11 @@ def run(G, scenario, method, seed):
                 else:
                     waiting.append(a)
             queues[node] = waiting
+            wait_ps[node] += len(waiting) * C.DT                 # person-seconds spent waiting here
+            if len(waiting) >= C.JAM_QUEUE:
+                jam_s[node] += C.DT                              # seconds with a jam here
+            if len(waiting) >= C.JAM_QUEUE // 2:
+                jam_small_s[node] += C.DT                        # ... with a smaller queue (sensitivity)
             if len(waiting) > node_peak[node]:
                 node_peak[node] = len(waiting)
             if len(waiting) > max_queue:
@@ -585,6 +593,9 @@ def run(G, scenario, method, seed):
         "max_hazard_crossed": round(max((a.max_hazard for a in agents), default=0.0), 3),
         "max_queue": max_queue,
         "max_queue_node": max_queue_node,
+        "jam_s": {n: round(v, 1) for n, v in jam_s.items() if v >= C.JAM_MIN_S},
+        "jam_small_s": {n: round(v, 1) for n, v in jam_small_s.items() if v >= C.JAM_MIN_S},
+        "wait_person_s": round(sum(wait_ps.values()), 1),
         "queue_peaks": dict(sorted(((n, q) for n, q in node_peak.items() if q >= 5), key=lambda x: -x[1])[:8]),
         "peak_density_pm2": round(peak_density, 2),
         "exits_used": dict(sorted(exit_counts.items())),

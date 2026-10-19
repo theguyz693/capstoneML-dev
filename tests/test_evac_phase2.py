@@ -87,6 +87,12 @@ def test_tower_generator():
     assert len(room_nodes(G)) == 3 * 16 and not unreachable_nodes(G)
 
 
+def test_jam_metrics_present():
+    G = load_campus()
+    m, _ = run(G.copy(), SC["floor3_full_200"], "safe_shortest", 0)
+    assert m["wait_person_s"] > 0 and "f3_stairs 2" in m["jam_s"]
+
+
 if __name__ == "__main__":
     fns = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for f in fns:

@@ -257,6 +257,7 @@ FIGURES = [  # (file, title, one-line takeaway) shown on the Results tab, in pre
     ("fig30_safety_speed.png", "Safety vs speed", "One dial trades time for smoke exposure; most other methods are dominated."),
     ("fig31_eta.png", "Time to exit on signs", "Calibrated 90% ranges hold for 90% of people on unseen evacuations."),
     ("fig33_scalability.png", "Scalability", "Re-planning 2,000 people on the campus takes ~1 s; fits the 5 s cycle up to ~2,400 people in a 1,600-node tower."),
+    ("fig34_jams.png", "Secondary jams", "Guidance rarely creates new jams; total queueing drops ~75%."),
     ("fig13_fairness.png", "Fairness", "Who pays: step-free users, upper floors, lower floors."),
     ("fig10_sensitivity.png", "Sensitivity", "The ranking survives changes to every physical assumption."),
     ("fig28_calibration.png", "Calibration on real crowds", "Speed-density and door flow fitted to Juelich experiments."),
