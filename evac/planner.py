@@ -202,3 +202,38 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
         elif cur_cost < math.inf:
             book_path(G, res, cur, t0, a.speed_mult, w)
     return changes
+
+
+def _leg_time(d, speed_mult=1.0):
+    """Plain walking time of an edge (no hazard penalty) - for time-to-exit estimates."""
+    return _walk_time(d, speed_mult)
+
+
+def _book_time(G, res, path, t0, speed_mult, w, book=True):
+    t = t0
+    for u, v in zip(path, path[1:]):
+        d = G.edges[u, v]
+        te = res.entry_time(u, v, d, t, w)
+        if book:
+            res.reserve(u, v, te, w)
+        t = te + _leg_time(d, speed_mult)
+    return t
+
+
+def predict_arrivals(G, agents, moving, standing, now, horizon=math.inf):
+    """Time-to-exit for everyone standing at a node, from the SAME capacity bookings the planner uses:
+    people already walking and people who ignore guidance are booked first, then everyone else in order of
+    readiness, each on the route they currently have (people walking an edge get an estimate too). Unlike a sum of per-corridor predictions, this accounts
+    for the crowd that will arrive at each door and stair BEFORE the person does. Returns {agent id: seconds}."""
+    res = Reservations(G, now, horizon)
+    out = {}
+    for a in moving:
+        u, v = a.path[a.idx], a.path[a.idx + 1]
+        d = G.edges[u, v]
+        rem = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult * smoke_speed_factor(d.get("hazard", 0.0)))
+        out[a.id] = _book_time(G, res, a.path[a.idx + 1:], now + rem, a.speed_mult, getattr(a, "size", 1.0)) - now
+    for a in sorted(standing, key=lambda a: (not getattr(a, "compliant", True), max(a.start, now), a.id)):
+        t0 = max(a.start, now)
+        out[a.id] = _book_time(G, res, a.path[a.idx:], t0, a.speed_mult, getattr(a, "size", 1.0)) - now
+    return out
+

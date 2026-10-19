@@ -1,0 +1,90 @@
+{
+ "best": "eta_ml",
+ "eta_ml": {
+  "bias_factor": 1.0256410256410258,
+  "range factor": 1.964857165846396,
+  "coverage": 0.9044713568148901,
+  "bands": [
+   {
+    "from_s": 0,
+    "to_s": 30,
+    "bias_factor": 1.0317460317460319,
+    "range_factor": 2.5012406947890815,
+    "n": 19002
+   },
+   {
+    "from_s": 30,
+    "to_s": 60,
+    "bias_factor": 1.0344827586206897,
+    "range_factor": 2.653608872168295,
+    "n": 15538
+   },
+   {
+    "from_s": 60,
+    "to_s": 120,
+    "bias_factor": 1.04,
+    "range_factor": 1.6790543565863703,
+    "n": 18341
+   },
+   {
+    "from_s": 120,
+    "to_s": 240,
+    "bias_factor": 1.01205833304189,
+    "range_factor": 1.609363830619335,
+    "n": 10178
+   },
+   {
+    "from_s": 240,
+    "to_s": 1000000000.0,
+    "bias_factor": 0.988538681948424,
+    "range_factor": 1.1672173143306581,
+    "n": 2633
+   }
+  ],
+  "coverage banded": 0.9075837416412437
+ },
+ "eta_plan": {
+  "bias_factor": 1.1593019638046935,
+  "range factor": 2.0224820427065504,
+  "coverage": 0.9013127484515115,
+  "bands": [
+   {
+    "from_s": 0,
+    "to_s": 30,
+    "bias_factor": 1.141732283464567,
+    "range_factor": 2.4094325427585987,
+    "n": 20876
+   },
+   {
+    "from_s": 30,
+    "to_s": 60,
+    "bias_factor": 1.1953727506426737,
+    "range_factor": 2.2477743566759876,
+    "n": 15976
+   },
+   {
+    "from_s": 60,
+    "to_s": 120,
+    "bias_factor": 1.2212643678160922,
+    "range_factor": 1.8241118229470004,
+    "n": 20511
+   },
+   {
+    "from_s": 120,
+    "to_s": 240,
+    "bias_factor": 1.0754280114192678,
+    "range_factor": 1.804994898266931,
+    "n": 6530
+   },
+   {
+    "from_s": 240,
+    "to_s": 1000000000.0,
+    "bias_factor": 1.0387655250282273,
+    "range_factor": 1.0476447464658059,
+    "n": 1799
+   }
+  ],
+  "coverage banded": 0.900804289544236
+ },
+ "source": "evac/eta_study.py (look-ahead runs, conformal split by seed)"
+}

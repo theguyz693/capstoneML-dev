@@ -110,8 +110,11 @@ python tests/test_evac_improving_ml.py
 ### Phase 2 (half-done items)
 ```bash
 python -m evac.safety_tradeoff      # 1. safety-vs-speed dial (config.SAFETY_WEIGHT) swept vs all methods -> docs/safety_tradeoff.md
+python -m evac.eta_study           # 2. time-to-exit estimates checked on 130k simulated predictions -> docs/eta_study.md
 python tests/test_evac_phase2.py
 ```
+Time-to-exit ranges on the dashboard route and kiosk signs are calibrated per band of predicted time
+(`evac/eta_calibration.json`); scenario key `eta_probe_at: [t, ...]` records predictions during a run.
 Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/research/run`).
 
 ## Files
@@ -147,6 +150,7 @@ Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/researc
 | `calibration.py` | Calibration of speed-density curve and door flow on Juelich trajectories; simulator vs experiment (Improving ML). |
 | `ml_v3.py` | Crossing-time dataset from the calibrated simulator (campus, hospital, random geometries), hybrid model v3, real-data test, conformal ranges, in-the-loop test. |
 | `safety_tradeoff.py` | Safety-vs-speed curve of the planner (SAFETY_WEIGHT 0-8) with every other method as a point (Phase 2). |
+| `eta_study.py` | How good is "about X min to get out"? ML sum vs planner bookings vs actual, conformal ranges (Phase 2). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

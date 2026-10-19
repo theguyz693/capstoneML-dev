@@ -239,16 +239,10 @@ def _real_margin():
         return 1.0
 
 
-def route_eta(G, origin, fire_active, step_free=False, state=None, mover_speed=1.0, mover_size=1.0):
-    """Navigation query for one person (dashboard 'Evac Route' and kiosk signs):
-    route = Dijkstra on PREDICTED crossing times (learned model) x hazard penalty (+ exposure penalty), edges
-    on fire removed (rule, not ML); time-to-exit = sum of predicted times along the route, with a range from
-    the 5 % / 95 % quantile models. state: optional crowd snapshot from the simulator
-    {"qa": {(u, v): n}, "qnode": {u: n}, "occ": {edge: n}, "planned": {(u, v): n}}.
-    Note: the crowd is taken as it is NOW (it does not evolve along the route), so with heavy crowds the range
-    is a rough guide - the capacity planner (lookahead) is what coordinates many people."""
+def eta_table(G, idx, state, fire_active, step_free=False, mover_speed=1.0, mover_size=1.0):
+    """Time-to-exit from EVERY node at once: route by predicted crossing times (x hazard penalty), then the sum of
+    the predicted times along that route, with a 5-95 % range. Returns {node: (path, eta, lo, hi)}."""
     st = state or {}
-    idx = EdgeIndex(G)
     X = features_from_counts(G, idx, st.get("qa", {}), st.get("qnode", {}), st.get("occ", {}),
                              st.get("planned", {}), mover_speed, mover_size)
     med = _predict("ml", X)
@@ -258,15 +252,49 @@ def route_eta(G, origin, fire_active, step_free=False, state=None, mover_speed=1
     except (FileNotFoundError, KeyError):
         lo = hi = None
     _dist, tab = _table(G, idx, med, fire_active, step_free)
-    path = tab.get(origin)
-    if not path:
+    out = {}
+    for n, path in tab.items():
+        pos = [idx.pos[(u, v)] for u, v in zip(path, path[1:])]
+        out[n] = (path, float(med[pos].sum()), float(lo[pos].sum()) if lo is not None else None,
+                  float(hi[pos].sum()) if hi is not None else None)
+    return out, med
+
+
+def route_eta(G, origin, fire_active, step_free=False, state=None, mover_speed=1.0, mover_size=1.0):
+    """Navigation query for one person (dashboard 'Evac Route' and kiosk signs):
+    route = Dijkstra on PREDICTED crossing times (learned model) x hazard penalty (+ exposure penalty), edges
+    on fire removed (rule, not ML); time-to-exit = sum of predicted times along the route, with a range from
+    the 5 % / 95 % quantile models. state: optional crowd snapshot from the simulator
+    {"qa": {(u, v): n}, "qnode": {u: n}, "occ": {edge: n}, "planned": {(u, v): n}}.
+    Note: the crowd is taken as it is NOW (it does not evolve along the route), so with heavy crowds the range
+    is a rough guide - the capacity planner (lookahead) is what coordinates many people."""
+    idx = EdgeIndex(G)
+    tab, med = eta_table(G, idx, state, fire_active, step_free, mover_speed, mover_size)
+    if origin not in tab:
         return {"path": None}
-    pos = [idx.pos[(u, v)] for u, v in zip(path, path[1:])]
+    path, eta, lo, hi = tab[origin]
     legs = [{"from": u, "to": v, "etype": G.edges[u, v]["etype"], "hazard": round(G.edges[u, v].get("hazard", 0.0), 2),
-             "pred_s": round(float(med[i]), 1)} for (u, v), i in zip(zip(path, path[1:]), pos)]
-    out = {"path": path, "exit": path[-1], "eta_s": round(float(med[pos].sum()), 1), "legs": legs,
-           "model": getattr(C, "DELAY_MODEL", "v1")}
+             "pred_s": round(float(med[idx.pos[(u, v)]]), 1)} for u, v in zip(path, path[1:])]
+    out = {"path": path, "exit": path[-1], "eta_s": round(eta, 1), "legs": legs, "model": getattr(C, "DELAY_MODEL", "v1")}
     if lo is not None:
-        out["eta_lo_s"] = round(float(lo[pos].sum()), 1)
-        out["eta_hi_s"] = round(float(hi[pos].sum()), 1)
+        out["eta_lo_s"], out["eta_hi_s"] = round(lo, 1), round(hi, 1)
+    cal = _eta_calibration()
+    if cal:                       # route-level range, calibrated on whole evacuations (evac/eta_study.py)
+        for band in cal["eta_ml"]["bands"]:
+            if band["from_s"] < max(eta, 1.0) <= band["to_s"]:
+                c = max(eta, 1.0) * band["bias_factor"]
+                out.update(eta_s=round(c, 1), eta_lo_s=round(c / band["range_factor"], 1),
+                           eta_hi_s=round(c * band["range_factor"], 1), eta_raw_s=round(eta, 1),
+                           eta_range="90% range, calibrated on simulated evacuations (docs/eta_study.md)")
+                break
     return out
+
+
+def _eta_calibration():
+    import json
+    p = os.path.join(HERE, "eta_calibration.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None

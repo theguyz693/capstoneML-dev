@@ -204,6 +204,59 @@ def _forced_detours(G, fire_active, queues, waiting_agents, own_route):
     return n
 
 
+def crowd_state(agents, queues, occ, t):
+    """Crowd snapshot as plain counts (what sensors could report): people queued per edge and per node,
+    people on each edge, people whose route uses each edge."""
+    qa, qnode, planned = defaultdict(int), {}, defaultdict(int)
+    for node, q in queues.items():
+        qnode[node] = len(q)
+        for a in q:
+            if a.idx < len(a.path) - 1:
+                qa[(node, a.path[a.idx + 1])] += 1
+    for a in agents:
+        if a.path and a.state not in ("evacuated", "needs_assistance", "stranded", "in_place"):
+            for i in range(a.idx, len(a.path) - 1):
+                planned[(a.path[i], a.path[i + 1])] += 1
+    return {"qa": dict(qa), "qnode": qnode, "occ": {k: v for k, v in occ.items() if v > 0},
+            "planned": dict(planned), "t": t, "inside": sum(a.state in ("waiting", "queued", "moving") for a in agents)}
+
+
+def _eta_probe(G, agents, queues, moving, occ, t, fire_active, idx_cache):
+    """Time-to-exit predictions for everyone standing at a node at time t (Phase 2, evac/eta_study.py):
+    'ml' = sum of learned crossing times on the current crowd, 'plan' = capacity bookings of all routes."""
+    standing = [a for q in queues.values() for a in q if a.path and a.idx < len(a.path) - 1]
+    walking = [a for a in moving if a.path and a.idx < len(a.path) - 1]
+    if not standing and not walking:
+        return []
+    from .physics import smoke_speed_factor as _ssf
+    from .planner import predict_arrivals
+    plan = predict_arrivals(G, agents, walking, standing, t)
+    if "idx" not in idx_cache:
+        idx_cache["idx"] = learned_planner.EdgeIndex(G)
+    st = crowd_state(agents, queues, occ, t)
+    tables = {}
+    rows = []
+    for a in standing + walking:
+        key = (a.step_free, round(a.speed_mult, 1), a.size)
+        if key not in tables:
+            tables[key] = learned_planner.eta_table(G, idx_cache["idx"], st, fire_active, a.step_free, key[1], a.size)[0]
+        if a.state == "moving":                     # rest of the current edge, then from its end node
+            u, v = a.path[a.idx], a.path[a.idx + 1]
+            d = G.edges[u, v]
+            rem = max(0.0, d["length_m"] - a.pos) / (d["free_speed"] * a.speed_mult * _ssf(d.get("hazard", 0.0)))
+            node = v
+        else:
+            rem, node = 0.0, a.path[a.idx]
+        ml = tables[key].get(node)
+        rows.append({"agent": a.id, "t": t, "node": node, "state": a.state, "profile": a.profile,
+                     "compliant": a.compliant, "queue_here": len(queues.get(node, ())), "inside": st["inside"],
+                     "eta_ml": None if ml is None else round(rem + ml[1], 1),
+                     "eta_ml_lo": None if ml is None or ml[2] is None else round(rem + ml[2], 1),
+                     "eta_ml_hi": None if ml is None or ml[3] is None else round(rem + ml[3], 1),
+                     "eta_plan": round(plan[a.id], 1) if a.id in plan else None})
+    return rows
+
+
 def run(G, scenario, method, seed):
     """Run one evacuation. Returns (metrics dict, per-agent records).
     method='optimum' returns the theoretical lower bound instead of a simulation."""
@@ -381,10 +434,16 @@ def run(G, scenario, method, seed):
         frames.append({"t": round(now, 1), "pts": pts,
                        "hazard": {n: G.nodes[n]["hazard"] for n in G if G.nodes[n]["hazard"] > 0} if dynamic else None})
     stop_at = float(scenario.get("stop_at_s", C.MAX_TIME_S))      # snapshot mode (dashboard route queries)
+    eta_probe = sorted(scenario.get("eta_probe_at", []))            # time-to-exit study (evac/eta_study.py)
+    eta_rows, eta_idx = [], {}
     while t < min(C.MAX_TIME_S, stop_at) and (active or moving or any(queues.values())):
         if track_every and t >= next_frame:
             next_frame += track_every
             snapshot(t)
+        if eta_probe and t >= eta_probe[0]:
+            eta_probe.pop(0)
+            eta_rows += _eta_probe(G, agents, queues, moving, occ, t, fire_active, eta_idx)
+            eta_probe = eta_probe or [math.inf]
         if dynamic and t >= next_hazard:
             next_hazard += C.HAZARD_UPDATE_S
             apply_hazard(G, fires, t)
@@ -533,19 +592,12 @@ def run(G, scenario, method, seed):
     if log_edges:
         metrics["edge_rows"] = edge_rows
     if "stop_at_s" in scenario:            # crowd state at stop_at_s, as counts the learned model can use
-        qa, qnode, planned = defaultdict(int), {}, defaultdict(int)
-        for node, q in queues.items():
-            qnode[node] = len(q)
-            for a in q:
-                if a.idx < len(a.path) - 1:
-                    qa[(node, a.path[a.idx + 1])] += 1
-        for a in agents:
-            if a.path and a.state not in ("evacuated", "needs_assistance", "stranded", "in_place"):
-                for i in range(a.idx, len(a.path) - 1):
-                    planned[(a.path[i], a.path[i + 1])] += 1
-        metrics["state"] = {"qa": dict(qa), "qnode": qnode, "occ": {k: v for k, v in occ.items() if v > 0},
-                            "planned": dict(planned), "t": t,
-                            "inside": sum(a.state in ("waiting", "queued", "moving") for a in agents)}
+        metrics["state"] = crowd_state(agents, queues, occ, t)
+    if eta_probe:
+        out_t = {a.id: a.t_out for a in agents}
+        for r in eta_rows:
+            r["actual_s"] = None if out_t[r["agent"]] is None else round(out_t[r["agent"]] - r["t"], 1)
+        metrics["eta_rows"] = eta_rows
     if track_every:
         snapshot(t)
         metrics["frames"] = frames

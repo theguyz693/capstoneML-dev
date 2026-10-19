@@ -159,7 +159,28 @@ def signs(req: SignRequest):
             msg += f", exit via {path[-1]}."
             res["kiosk"] = {"node": req.kiosk_node, "path": path, "next": path[1] if len(path) > 1 else None,
                             "exit": path[-1], "message": msg}
+            try:                  # time-to-exit with a calibrated range (ML v3, docs/eta_study.md)
+                from . import config as C
+                from .learned_planner import route_eta
+                old = C.DELAY_MODEL
+                C.DELAY_MODEL = "v3"
+                try:
+                    prof = C.PROFILES["wheelchair"] if req.step_free else C.PROFILES["walk"]
+                    e = route_eta(G, req.kiosk_node, bool(fires), req.step_free, None, prof["speed"], prof["size"])
+                finally:
+                    C.DELAY_MODEL = old
+                if e.get("path") == path and e.get("eta_lo_s") is not None:
+                    res["kiosk"].update(eta_s=e["eta_s"], eta_lo_s=e["eta_lo_s"], eta_hi_s=e["eta_hi_s"])
+                    res["kiosk"]["message"] = msg[:-1] + f" - about {_fmt_range(e['eta_lo_s'], e['eta_hi_s'])}."
+            except FileNotFoundError:
+                pass
     return res
+
+
+def _fmt_range(lo, hi):
+    """'40 s-1.5 min' style text for a sign."""
+    f = lambda x: f"{x:.0f} s" if x < 90 else f"{x / 60:.1f} min"
+    return f"{f(lo)}-{f(hi)}"
 
 
 class RouteRequest(BaseModel):
@@ -211,7 +232,7 @@ def route(req: RouteRequest):
               "peak_hazard": max((G.nodes[n]["hazard"] for n in (r["path"] or [])), default=0.0)})
     if r["path"]:
         lo, hi = r.get("eta_lo_s"), r.get("eta_hi_s")
-        rng = f"{lo / 60:.1f}-{hi / 60:.1f} min" if lo is not None else f"~{r['eta_s'] / 60:.1f} min"
+        rng = _fmt_range(lo, hi) if lo is not None else f"~{r['eta_s'] / 60:.1f} min"
         r["message"] = f"Exit via {r['exit']} - about {rng} to get out"
     else:
         r["message"] = "No safe route. Stay in a protected area and wait for assistance."
@@ -234,6 +255,7 @@ FIGURES = [  # (file, title, one-line takeaway) shown on the Results tab, in pre
     ("fig16_freshness.png", "Data freshness", "In a growing fire, stale crowd data costs safety, not time."),
     ("fig17_ablation.png", "Ablations", "Capacity booking and sustainable stair capacity are the essential parts."),
     ("fig30_safety_speed.png", "Safety vs speed", "One dial trades time for smoke exposure; most other methods are dominated."),
+    ("fig31_eta.png", "Time to exit on signs", "Calibrated 90% ranges hold for 90% of people on unseen evacuations."),
     ("fig13_fairness.png", "Fairness", "Who pays: step-free users, upper floors, lower floors."),
     ("fig10_sensitivity.png", "Sensitivity", "The ranking survives changes to every physical assumption."),
     ("fig28_calibration.png", "Calibration on real crowds", "Speed-density and door flow fitted to Juelich experiments."),
