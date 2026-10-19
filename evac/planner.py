@@ -79,9 +79,10 @@ def _leg(d, speed_mult=1.0, walk=None):
     crossing an exposed edge so waiting in a safe queue is preferred over walking through smoke.
     walk: a learned prediction of the walking time under current crowding (replaces free-flow time)."""
     h = d.get("hazard", 0.0)
-    extra = C.HAZARD_DETOUR_PENALTY_S if h >= C.HAZARD_EXPOSURE else 0.0
+    w = C.SAFETY_WEIGHT
+    extra = w * C.HAZARD_DETOUR_PENALTY_S if h >= C.HAZARD_EXPOSURE else 0.0
     t = walk / speed_mult if walk is not None else _walk_time(d, speed_mult)
-    return t * _hazard_penalty(h) + extra
+    return t * (1.0 + w * (_hazard_penalty(h) - 1.0)) + extra
 
 
 def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0, w=1.0):

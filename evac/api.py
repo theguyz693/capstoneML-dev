@@ -82,6 +82,7 @@ class RunRequest(BaseModel):
     fire_spreading: bool = False
     no_fire: bool = False                    # run the scenario without any fire
     frame_every_s: float = 2.0
+    safety_weight: Optional[float] = None    # safety-vs-speed dial of the capacity planner (0-8, default 1)
 
 
 @router.post("/run")
@@ -104,11 +105,19 @@ def run_scenario(req: RunRequest):
     if req.no_fire:
         sc["fires"] = []
     sc["record_tracks"] = req.frame_every_s
+    from . import config as C
+    if req.safety_weight is not None and not 0.0 <= req.safety_weight <= 8.0:
+        raise HTTPException(400, "safety_weight 0-8")
+    old_w = C.SAFETY_WEIGHT
     out = {}
     for m in req.methods:
         if m not in ALLOWED:
             raise HTTPException(400, f"unknown method {m}")
-        metrics, recs = run(G0b.copy(), sc, m, req.seed)
+        C.SAFETY_WEIGHT = old_w if req.safety_weight is None else req.safety_weight
+        try:
+            metrics, recs = run(G0b.copy(), sc, m, req.seed)
+        finally:
+            C.SAFETY_WEIGHT = old_w
         frames = metrics.pop("frames", [])
         times = sorted(r["t_out"] for r in recs if r["t_out"] is not None)
         n = metrics["n_agents"]
@@ -224,6 +233,7 @@ FIGURES = [  # (file, title, one-line takeaway) shown on the Results tab, in pre
     ("fig14_mlloop.png", "ML in the loop", "Prediction quality matters little; coordination matters a lot."),
     ("fig16_freshness.png", "Data freshness", "In a growing fire, stale crowd data costs safety, not time."),
     ("fig17_ablation.png", "Ablations", "Capacity booking and sustainable stair capacity are the essential parts."),
+    ("fig30_safety_speed.png", "Safety vs speed", "One dial trades time for smoke exposure; most other methods are dominated."),
     ("fig13_fairness.png", "Fairness", "Who pays: step-free users, upper floors, lower floors."),
     ("fig10_sensitivity.png", "Sensitivity", "The ranking survives changes to every physical assumption."),
     ("fig28_calibration.png", "Calibration on real crowds", "Speed-density and door flow fitted to Juelich experiments."),

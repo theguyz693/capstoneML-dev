@@ -103,6 +103,9 @@ SLOT_S = 4.0                  # capacity booking slot length (s): an edge admits
 REPLAN_S = 5.0                # 'lookahead' re-plans every 5 s
 HORIZON_S = 300.0             # bookings predicted this far ahead (s). Short horizons (<=120 s) performed WORSE than no planning in tests.
 SWITCH_GAIN = 0.15            # switch route only if predicted >= 15% faster (anti-oscillation)
+SAFETY_WEIGHT = 1.0           # Phase 2: safety-vs-speed dial for the capacity planner (ccrp / lookahead). 0 = only the
+                              # hard rules (never walk into fire); 1 = default; >1 = avoid smoke even at a big time cost.
+                              # Scales both the smoke multiplier and HAZARD_DETOUR_PENALTY_S (evac/safety_tradeoff.py)
 HAZARD_DETOUR_PENALTY_S = 300.0  # planner adds this per edge with hazard >= HAZARD_EXPOSURE, so it only
                                  # trades safety for speed when waiting would exceed ~5 min
 

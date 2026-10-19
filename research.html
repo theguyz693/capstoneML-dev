@@ -99,6 +99,8 @@
     <label>Fire</label>
     <select id="fire"><option value="">scenario default</option><option value="__none">no fire</option></select>
     <div class="checks"><label><input type="checkbox" id="spread"> fire spreads over time</label></div>
+    <label>Safety vs speed (look-ahead / CCRP): <b id="safeV">1 (default)</b></label>
+    <input type="range" id="safe" min="0" max="8" step="0.25" value="1" title="0 = only never walk into fire; higher = avoid smoke even if slower">
     <label>Seed (same seed = same people)</label>
     <input type="number" id="seed" value="0" min="0">
     <button id="runBtn">Run comparison</button>
@@ -370,7 +372,8 @@ function curve() {
 async function runRace() {
   const methods = [...document.querySelectorAll("#methods input:checked")].map(i => i.value);
   if (!methods.length) { $("status").textContent = "Pick at least one method."; return; }
-  const body = { building: BLD, scenario: $("scen").value, methods, seed: Number($("seed").value), compliance: Number($("comp").value) };
+  const body = { building: BLD, scenario: $("scen").value, methods, seed: Number($("seed").value), compliance: Number($("comp").value),
+                 safety_weight: Number($("safe").value) };
   if ($("herd").value !== "") body.herding = Number($("herd").value);
   const f = $("fire").value;
   if (f === "__none") { body.fire_node = null; body.no_fire = true; }
@@ -595,6 +598,7 @@ async function loadBuilding() {
   $("methods").innerHTML = Object.keys(LABEL).filter(m => m !== "ml").map(m =>
     `<label><input type="checkbox" value="${m}" ${DEFAULT_METHODS.includes(m) ? "checked" : ""}><span style="color:${LINE[m]}">●</span> ${LABEL[m]}</label>`).join("");
   $("comp").oninput = () => $("compV").textContent = Math.round($("comp").value * 100) + "%";
+  $("safe").oninput = () => $("safeV").textContent = Number($("safe").value) + (Number($("safe").value) === 1 ? " (default)" : Number($("safe").value) === 0 ? " (fire rule only)" : "");
   $("sRad").oninput = () => { $("sRadV").textContent = $("sRad").value; };
   $("sRad").onchange = () => loadSigns();
   $("sFire").onchange = () => loadSigns(); $("sStep").onchange = () => loadSigns();

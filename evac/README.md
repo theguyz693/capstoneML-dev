@@ -107,6 +107,13 @@ python tests/test_evac_improving_ml.py
   snapshot, `stop_at_s`). The old Random-Forest route (`server.py /api/evacuate`, "v1") is no longer used.
 - All main results were re-run with the calibrated parameters; the earlier reports are in `docs/archive_handbook_params/`.
 
+### Phase 2 (half-done items)
+```bash
+python -m evac.safety_tradeoff      # 1. safety-vs-speed dial (config.SAFETY_WEIGHT) swept vs all methods -> docs/safety_tradeoff.md
+python tests/test_evac_phase2.py
+```
+Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/research/run`).
+
 ## Files
 | File | What it does |
 | --- | --- |
@@ -139,6 +146,7 @@ python tests/test_evac_improving_ml.py
 | `jupedsim_check.py` | Cross-check of the simulator against JuPedSim on the same geometry and people (Session 9). |
 | `calibration.py` | Calibration of speed-density curve and door flow on Juelich trajectories; simulator vs experiment (Improving ML). |
 | `ml_v3.py` | Crossing-time dataset from the calibrated simulator (campus, hospital, random geometries), hybrid model v3, real-data test, conformal ranges, in-the-loop test. |
+| `safety_tradeoff.py` | Safety-vs-speed curve of the planner (SAFETY_WEIGHT 0-8) with every other method as a point (Phase 2). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.
