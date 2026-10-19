@@ -518,7 +518,11 @@ def run(G, scenario, method, seed):
             q = queues[node]
             if not q:
                 continue
-            q.sort(key=lambda a: (a.queued_at, a.id))
+            if C.DOOR_PRIORITY_VULNERABLE:          # marshals let vulnerable people through first
+                from .planner import vulnerable
+                q.sort(key=lambda a: (not vulnerable(a), a.queued_at, a.id))
+            else:
+                q.sort(key=lambda a: (a.queued_at, a.id))
             waiting = []
             for a in q:
                 u, v = a.path[a.idx], a.path[a.idx + 1]

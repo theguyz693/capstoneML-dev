@@ -51,6 +51,21 @@ def test_eta_probe_and_calibrated_range():
         assert e["eta_lo_s"] < e["eta_s"] < e["eta_hi_s"]
 
 
+def test_priority_switches_are_off_by_default_and_change_order():
+    assert C.PRIORITY_VULNERABLE is False and C.DOOR_PRIORITY_VULNERABLE is False
+    from evac.planner import plan_all, vulnerable
+    from evac.simulator import Agent
+    G = load_campus()
+    a = Agent(0, "classroom g17", 0.0, 1.0, False)
+    b = Agent(1, "classroom g17", 5.0, 0.7, True, size=2.0, profile="wheelchair")
+    assert vulnerable(b) and not vulnerable(a)
+    C.PRIORITY_VULNERABLE = True
+    try:
+        assert plan_all(G, [a, b], False)          # both planned, wheelchair user booked first
+    finally:
+        C.PRIORITY_VULNERABLE = False
+
+
 if __name__ == "__main__":
     fns = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for f in fns:

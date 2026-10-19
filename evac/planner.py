@@ -143,10 +143,20 @@ def book_path(G, res, path, t0, speed_mult=1.0, w=1.0):
     return t
 
 
+def vulnerable(a):
+    """Slow walkers, wheelchair users, beds and anyone who needs a step-free route."""
+    return getattr(a, "step_free", False) or getattr(a, "profile", "walk") in ("slow", "wheelchair", "bed", "step_free")
+
+
+def _prio(a):
+    return 0 if (C.PRIORITY_VULNERABLE and vulnerable(a)) else 1
+
+
 def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf, walk=None):
-    """One-shot CCRP: plan agents in order of when they are ready to move."""
+    """One-shot CCRP: plan agents in order of when they are ready to move
+    (vulnerable people first when config.PRIORITY_VULNERABLE)."""
     res = Reservations(G, now, horizon, walk)
-    order = sorted(agents, key=lambda a: (a.start, a.id))
+    order = sorted(agents, key=lambda a: (_prio(a), a.start, a.id))
     out = {}
     for a in order:
         w = getattr(a, "size", 1.0)
@@ -184,7 +194,7 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
 
     changes = 0
     for a in sorted((a for a in standing if getattr(a, "compliant", True)),
-                    key=lambda a: (max(a.start, now), a.id)):
+                    key=lambda a: (_prio(a), max(a.start, now), a.id)):
         node = a.path[a.idx]
         t0 = max(a.start, now)
         cur = a.path[a.idx:]
