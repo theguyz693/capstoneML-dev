@@ -114,6 +114,7 @@ python -m evac.eta_study           # 2. time-to-exit estimates checked on 130k s
 python -m evac.priority_study      # 3. vulnerable people first (planner / queue priority) -> docs/priority.md
 python -m evac.scalability         # 4. re-plan time vs building size and crowd (real buildings + towers) -> docs/scalability.md
 python -m evac.jam_study           # 5. does guidance create new jams elsewhere? (secondary jams) -> docs/jam_study.md
+python -m evac.compliance_study    # 6. planner that does not know who follows it (naive / compliance-aware) -> docs/compliance.md
 python tests/test_evac_phase2.py
 ```
 Time-to-exit ranges on the dashboard route and kiosk signs are calibrated per band of predicted time
@@ -157,6 +158,7 @@ Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/researc
 | `priority_study.py` | Vulnerable-first planning (config.PRIORITY_VULNERABLE) and queue priority: who gains, who pays (Phase 2). |
 | `scalability.py` | Planner compute time vs building size and crowd, incl. generated towers up to 20 floors (Phase 2). The planner's route search is A* (`planner._Fast`), same results as before, ~5x faster. |
 | `jam_study.py` | Secondary jams (Choi et al. 2021): jams created by guidance that shortest path does not have; total queueing (Phase 2). |
+| `compliance_study.py` | Planner without knowledge of who complies: oracle vs naive vs compliance-aware booking (Phase 2). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

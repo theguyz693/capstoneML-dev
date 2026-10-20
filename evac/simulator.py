@@ -338,14 +338,17 @@ def run(G, scenario, method, seed):
 
     horizon = float(scenario.get("horizon_s", C.HORIZON_S))
     switch_gain = float(scenario.get("switch_gain", C.SWITCH_GAIN))
+    planner.FAMILIAR_EXIT = familiar
     if method in ("ccrp", "lookahead", "lookahead_ml"):
-        plannable = sensor.sense([a for a in agents if a.path is not None and a.compliant])
+        # 'oracle': the planner knows who follows it; otherwise it plans (and books) everyone the same way
+        plannable = sensor.sense([a for a in agents if a.path is not None and
+                                  (a.compliant or C.PLANNER_COMPLIANCE_MODEL != "oracle")])
         walk0 = (learned_planner.walk_predictions(G, edge_index, agents, {}, {})
                  if method == "lookahead_ml" else None)
         plans = planner.plan_all(G, plannable, fire_active,
                                  horizon=math.inf if method == "ccrp" else horizon, walk=walk0)
         for a in plannable:
-            if a.id in plans and a.id >= 0:          # negative ids are phantom (sensed but not real) people
+            if a.id in plans and a.id >= 0 and a.compliant:   # negative ids are phantom (sensed but not real) people
                 a.path = plans[a.id]
                 a.exit = a.path[-1]
 

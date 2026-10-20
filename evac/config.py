@@ -115,6 +115,13 @@ HAZARD_DETOUR_PENALTY_S = 300.0  # planner adds this per edge with hazard >= HAZ
 # Ablation switches (Session 6): turn one ingredient of the planner off to measure its contribution
 PLANNER_USE_SUSTAINABLE_CAP = True   # False: book nominal door/stair flow instead of what the edge can sustain
 PLANNER_BOOK_NONCOMPLIANT = True     # False: planner ignores where non-compliant people are heading
+# Phase 2 (compliance-aware planning, evac/compliance_study.py): what the planner knows about who follows it
+#   "oracle" - it knows exactly who ignores guidance and where they go (default; all results before Phase 2)
+#   "naive"  - it cannot tell, and assumes everyone follows its routes
+#   "aware"  - it cannot tell, and assumes a share PLANNER_ASSUMED_COMPLIANCE follows, the rest head for the
+#              familiar exit: each person's capacity is booked split over both routes
+PLANNER_COMPLIANCE_MODEL = "oracle"
+PLANNER_ASSUMED_COMPLIANCE = 0.7
 
 # ---------------------------------------------------------------- behaviour (Session 4)
 # These are SWEPT in experiments, not claimed to be measured human behaviour.

@@ -93,6 +93,19 @@ def test_jam_metrics_present():
     assert m["wait_person_s"] > 0 and "f3_stairs 2" in m["jam_s"]
 
 
+def test_compliance_models():
+    assert C.PLANNER_COMPLIANCE_MODEL == "oracle"
+    G = load_campus()
+    sc = SC["floor3_200_compliance60_herding"]
+    try:
+        for mode in ("naive", "aware"):
+            C.PLANNER_COMPLIANCE_MODEL = mode
+            m, _ = run(G.copy(), sc, "lookahead", 0)
+            assert m["evacuated"] + m["needs_assistance"] + m["stranded"] == m["n_agents"]
+    finally:
+        C.PLANNER_COMPLIANCE_MODEL = "oracle"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for f in fns:

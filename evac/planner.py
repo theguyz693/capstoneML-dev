@@ -243,19 +243,52 @@ def _prio(a):
     return 0 if (C.PRIORITY_VULNERABLE and vulnerable(a)) else 1
 
 
+FAMILIAR_EXIT = None          # set by the simulator for each run (where people who ignore guidance head)
+
+
+def _familiar_paths(G, fire_active):
+    """Route from every node to the familiar exit (what a person who ignores the signs does)."""
+    from .routing import route_table
+    if FAMILIAR_EXIT is None or FAMILIAR_EXIT not in G:
+        return {False: {}, True: {}}
+    return {sf: route_table(G, "safe_shortest", fire_active, sf, targets=[FAMILIAR_EXIT]) for sf in (False, True)}
+
+
+def _book_expected(G, res, a, route, node, t0, fam, w):
+    """Compliance model of the planner (config.PLANNER_COMPLIANCE_MODEL):
+       naive  - assumes the person follows the route: books it in full
+       aware  - books share p of the person on the route and (1 - p) on the way to the familiar exit,
+                p = config.PLANNER_ASSUMED_COMPLIANCE (the planner does not know WHO will comply)"""
+    if C.PLANNER_COMPLIANCE_MODEL != "aware":
+        book_path(G, res, route, t0, a.speed_mult, w)
+        return
+    p = C.PLANNER_ASSUMED_COMPLIANCE
+    other = fam[a.step_free].get(node)
+    if other is None or other == route:
+        book_path(G, res, route, t0, a.speed_mult, w)
+        return
+    book_path(G, res, route, t0, a.speed_mult, w * p)
+    book_path(G, res, other, t0, a.speed_mult, w * (1.0 - p))
+
+
 def plan_all(G, agents, fire_active, now=0.0, horizon=math.inf, walk=None):
     """One-shot CCRP: plan agents in order of when they are ready to move
     (vulnerable people first when config.PRIORITY_VULNERABLE)."""
     res = Reservations(G, now, horizon, walk)
     order = sorted(agents, key=lambda a: (_prio(a), a.start, a.id))
     out = {}
+    mode = C.PLANNER_COMPLIANCE_MODEL
+    fam = _familiar_paths(G, fire_active) if mode == "aware" else None
     for a in order:
         w = getattr(a, "size", 1.0)
         path, _cost, legs = earliest_route(G, res, a.origin, a.start, fire_active, a.step_free, a.speed_mult, w)
         if path is None:
             continue
-        for u, v, te in legs:
-            res.reserve(u, v, te, w)
+        if mode == "oracle":
+            for u, v, te in legs:
+                res.reserve(u, v, te, w)
+        else:
+            _book_expected(G, res, a, path, a.origin, a.start, fam, w)
         out[a.id] = path
     return out
 
@@ -277,8 +310,12 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
                                                          * smoke_speed_factor(d.get("hazard", 0.0)))
         book_path(G, res, a.path[a.idx + 1:], now + remaining, a.speed_mult, getattr(a, "size", 1.0))
 
-    # people who ignore guidance are not re-planned, but the planner sees where they are
-    # heading and books their capacity first
+    mode = C.PLANNER_COMPLIANCE_MODEL
+    if mode != "oracle":
+        return _replan_unknown_compliance(G, res, standing, now, fire_active, switch_gain)
+
+    # 'oracle' (default, all results before Phase 2): the planner KNOWS who ignores guidance and where they are
+    # heading, and books their capacity first
     for a in standing:
         if not getattr(a, "compliant", True) and C.PLANNER_BOOK_NONCOMPLIANT:
             book_path(G, res, a.path[a.idx:], max(a.start, now), a.speed_mult, getattr(a, "size", 1.0))
@@ -302,6 +339,40 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
             book_path(G, res, new, t0, a.speed_mult, w)
         elif cur_cost < math.inf:
             book_path(G, res, cur, t0, a.speed_mult, w)
+    return changes
+
+
+def _replan_unknown_compliance(G, res, standing, now, fire_active, switch_gain):
+    """Re-plan when the planner does NOT know who will follow it ('naive' / 'aware', Phase 2):
+    everyone standing gets a recommendation in order of readiness; people who comply take it (same switching
+    rules), people who do not ignore it - but the planner cannot tell them apart, so it books every person the
+    same way (naive: in full on the recommendation; aware: split by the assumed compliance rate)."""
+    fam = _familiar_paths(G, fire_active) if C.PLANNER_COMPLIANCE_MODEL == "aware" else None
+    changes = 0
+    for a in sorted(standing, key=lambda a: (_prio(a), max(a.start, now), a.id)):
+        node = a.path[a.idx]
+        t0 = max(a.start, now)
+        w = getattr(a, "size", 1.0)
+        cur = a.path[a.idx:]
+        new, new_cost, _ = earliest_route(G, res, node, t0, fire_active, a.step_free, a.speed_mult, w)
+        rec = cur
+        if getattr(a, "compliant", True):
+            cur_cost = path_cost(G, res, cur, t0, fire_active, a.step_free, a.speed_mult, w)
+            back = a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
+            gain = math.inf if cur_cost == math.inf else (cur_cost - new_cost) / max(1e-9, cur_cost - t0)
+            if new is not None and new != cur and not back and gain >= switch_gain:
+                a.path = a.path[:a.idx] + new
+                a.exit = new[-1]
+                a.changes += 1
+                changes += 1
+                rec = new
+            elif cur_cost == math.inf:
+                continue
+        elif new is not None:
+            rec = new            # what the sign tells them (they will not follow it)
+        else:
+            continue
+        _book_expected(G, res, a, rec, node, t0, fam, w)
     return changes
 
 
