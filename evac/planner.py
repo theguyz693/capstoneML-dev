@@ -45,6 +45,8 @@ class Reservations:
 
     def cap(self, d):
         cap = d["eff_cap"] if C.PLANNER_USE_SUSTAINABLE_CAP else d["flow_cap"]
+        if d.get("evac_lift"):
+            return cap * C.SLOT_S          # less than one person per slot: a car round trip spans several slots
         return max(1, int(cap * C.SLOT_S))
 
     @staticmethod
@@ -57,17 +59,29 @@ class Reservations:
         """Earliest time >= t at which one more person (of size w person-equivalents) can enter u->v."""
         s = self.slot(t)
         c = self.cap(d)
+        lift = d.get("evac_lift")
         while True:
-            if s * C.SLOT_S > self.now + self.horizon:   # beyond horizon: not predicted
+            # beyond the horizon: not predicted - except a lift car, whose queue is too long and too certain to ignore
+            if s * C.SLOT_S > self.now + self.horizon and not lift:
                 return max(t, s * C.SLOT_S)
             # a person always fits an EMPTY slot, even one larger than the slot (e.g. a bed on a narrow door)
             b = self.book[(u, v, s)]
-            if b + w <= c or b == 0:
+            if d.get("evac_lift") and w > c:         # the car is needed for a whole round trip: all slots free
+                n = int(math.ceil(C.LIFT_CAR_CAPACITY / c))
+                if all(self.book.get((u, v, s + j), 0) == 0 for j in range(n)):
+                    return max(t, s * C.SLOT_S)
+            elif b + w <= c or b == 0:
                 return max(t, s * C.SLOT_S)
             s += 1
 
     def reserve(self, u, v, t, w=1.0):
-        self.book[(u, v, self.slot(t))] += w
+        s = self.slot(t)
+        self.book[(u, v, s)] += w
+        d = self.G.edges[u, v]
+        if d.get("evac_lift"):             # one group per trip: the car is away for a whole round trip
+            c = self.cap(d)
+            for j in range(1, int(math.ceil(C.LIFT_CAR_CAPACITY / c))):
+                self.book[(u, v, s + j)] += c
 
 
 def _walk_time(d, speed_mult=1.0):
@@ -98,7 +112,7 @@ class _Fast:
             A = _walk_time(d, 1.0) * (1.0 + w * (_hazard_penalty(h) - 1.0))
             B = w * C.HAZARD_DETOUR_PENALTY_S if h >= C.HAZARD_EXPOSURE else 0.0
             cap = d["eff_cap"] if C.PLANNER_USE_SUSTAINABLE_CAP else d["flow_cap"]
-            c = max(1, int(cap * C.SLOT_S))
+            c = cap * C.SLOT_S if d.get("evac_lift") else max(1, int(cap * C.SLOT_S))
             ok = (_allowed(d, fire_active, False), _allowed(d, fire_active, True))
             self.adj[u].append((v, d, A, B, c, ok))
             self.adj[v].append((u, d, A, B, c, ok))
@@ -159,14 +173,17 @@ def earliest_route(G, res, source, t0, fire_active, step_free, speed_mult=1.0, w
             if not ok[step_free] or v not in hmap:
                 continue
             s = int(math.floor(t / S + 1e-9))          # earliest slot with room (Reservations.entry_time, inlined)
-            while True:
-                if s * S > horizon_end:
-                    break
-                b = book.get((u, v, s), 0)
-                if b + w <= c or b == 0:
-                    break
-                s += 1
-            te = max(t, s * S)
+            if d.get("evac_lift") and w > c:
+                te = res.entry_time(u, v, d, t, w)
+            else:
+                while True:
+                    if s * S > horizon_end:
+                        break
+                    b = book.get((u, v, s), 0)
+                    if b + w <= c or b == 0:
+                        break
+                    s += 1
+                te = max(t, s * S)
             tv = te + A * inv + B
             if tv < best.get(v, math.inf):
                 best[v] = tv
@@ -329,7 +346,8 @@ def replan(G, agents, moving, standing, now, fire_active, horizon, switch_gain, 
         w = getattr(a, "size", 1.0)
         cur_cost = path_cost(G, res, cur, t0, fire_active, a.step_free, a.speed_mult, w)
         new, new_cost, _ = earliest_route(G, res, node, t0, fire_active, a.step_free, a.speed_mult, w)
-        back = a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
+        back = (a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
+                and not (C.EVAC_LIFTS and G.nodes[node]["kind"] == "lift"))   # people may give up waiting for a lift
         gain = math.inf if cur_cost == math.inf else (cur_cost - new_cost) / max(1e-9, cur_cost - t0)
         if new is not None and new != cur and not back and gain >= switch_gain:
             a.path = a.path[:a.idx] + new
@@ -358,7 +376,8 @@ def _replan_unknown_compliance(G, res, standing, now, fire_active, switch_gain):
         rec = cur
         if getattr(a, "compliant", True):
             cur_cost = path_cost(G, res, cur, t0, fire_active, a.step_free, a.speed_mult, w)
-            back = a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
+            back = (a.idx > 0 and new is not None and len(new) > 1 and new[1] == a.path[a.idx - 1]
+                and not (C.EVAC_LIFTS and G.nodes[node]["kind"] == "lift"))   # people may give up waiting for a lift
             gain = math.inf if cur_cost == math.inf else (cur_cost - new_cost) / max(1e-9, cur_cost - t0)
             if new is not None and new != cur and not back and gain >= switch_gain:
                 a.path = a.path[:a.idx] + new

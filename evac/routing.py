@@ -32,7 +32,7 @@ def _allowed(d, fire_active, step_free):
     if d.get("hazard", 0.0) >= C.HAZARD_IMPASSABLE:
         return False
     if d["etype"] == "lift":
-        if fire_active and C.LIFTS_DISABLED_IN_FIRE:
+        if fire_active and C.LIFTS_DISABLED_IN_FIRE and not d.get("evac_lift"):
             return False
         if not step_free and C.LIFTS_ONLY_FOR_STEP_FREE:
             return False

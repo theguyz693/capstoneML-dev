@@ -257,6 +257,44 @@ def _eta_probe(G, agents, queues, moving, occ, t, fire_active, idx_cache):
     return rows
 
 
+def _lift_shaft(name):
+    return name.split("_", 1)[-1] if "_" in name else name
+
+
+def configure_evac_lifts(G):
+    """Mark evacuation lifts and give lift edges car-like physics: car speed, and a capacity (for the planner)
+    of one car-load per round trip from the top floor (cautious: the planner assumes one group per trip)."""
+    floors = max(d["floor"] for _n, d in G.nodes(data=True))
+    cycle = C.LIFT_DOOR_LOAD_S + 2 * max(1, floors) * C.STAIR_FLIGHT_LENGTH_M / C.LIFT_SPEED
+    for u, v, d in G.edges(data=True):
+        if d["etype"] != "lift":
+            continue
+        d["evac_lift"] = any(k in u or k in v for k in C.EVAC_LIFT_NAMES)
+        d["free_speed"] = C.LIFT_SPEED
+        d["flow_cap"] = d["eff_cap"] = C.LIFT_CAR_CAPACITY / cycle
+        d["jam_cap"] = C.LIFT_CAR_CAPACITY
+    return G
+
+
+def _board_lift(G, a, u, d, t, state):
+    """Evacuation-lift car: people already in the car ride on to the next floor; a new group boards only when
+    the car is back (free_at) or is loading at this floor at this moment and has room."""
+    if a.idx > 0 and G.edges[a.path[a.idx - 1], u]["etype"] == "lift":
+        return True                                  # still in the car
+    sh = _lift_shaft(u)
+    st = state.setdefault(sh, {"free_at": 0.0, "batch_t": None, "batch_floor": None, "load": 0.0})
+    fl = G.nodes[u]["floor"]
+    if (st["batch_t"] is not None and 0 <= t - st["batch_t"] <= C.LIFT_LOAD_WINDOW_S and st["batch_floor"] == fl
+            and st["load"] + a.size <= C.LIFT_CAR_CAPACITY):          # car still loading here with room
+        st["load"] += a.size
+        return True
+    if t >= st["free_at"] and a.size <= C.LIFT_CAR_CAPACITY:
+        travel = fl * C.STAIR_FLIGHT_LENGTH_M / C.LIFT_SPEED
+        st.update(batch_t=t, batch_floor=fl, load=a.size, free_at=t + C.LIFT_DOOR_LOAD_S + 2 * travel)
+        return True
+    return False
+
+
 def run(G, scenario, method, seed):
     """Run one evacuation. Returns (metrics dict, per-agent records).
     method='optimum' returns the theoretical lower bound instead of a simulation."""
@@ -267,6 +305,9 @@ def run(G, scenario, method, seed):
     fires = scenario.get("fires", [])
     fire_active = bool(fires)
     dynamic = is_dynamic(fires)
+    if C.EVAC_LIFTS:
+        configure_evac_lifts(G)
+    lift_state = {}           # shaft -> {"free_at", "batch_t", "batch_floor", "load"}  (evacuation lifts)
     apply_hazard(G, fires, 0.0 if dynamic else None)
 
     agents = spawn(G, {**scenario, "_seed": seed}, rng)
@@ -500,8 +541,11 @@ def run(G, scenario, method, seed):
             peak_density = max(peak_density, dens)
             if trace_key is not None and k == trace_key:
                 edge_trace.append((round(t, 2), round(dens, 3), round(weidmann_speed_factor(dens) * d["free_speed"], 3)))
-            a.pos += (d["free_speed"] * a.speed_mult * weidmann_speed_factor(dens)
-                      * smoke_speed_factor(d.get("hazard", 0.0)) * C.DT)
+            if C.EVAC_LIFTS and d["etype"] == "lift":
+                a.pos += d["free_speed"] * C.DT          # riding the car: car speed, whoever you are
+            else:
+                a.pos += (d["free_speed"] * a.speed_mult * weidmann_speed_factor(dens)
+                          * smoke_speed_factor(d.get("hazard", 0.0)) * C.DT)
             if a.pos >= d["length_m"]:
                 arrived.append(a)
         for a in arrived:
@@ -537,7 +581,14 @@ def run(G, scenario, method, seed):
                 if d.get("hazard", 0.0) >= C.HAZARD_IMPASSABLE:
                     waiting.append(a)        # will be detoured at the next hazard update
                     continue
-                if budget[k] >= 1.0 and occ[k] < d["jam_cap"]:
+                if C.EVAC_LIFTS and d["etype"] == "lift":
+                    if not _board_lift(G, a, u, d, t, lift_state):
+                        waiting.append(a)
+                        continue
+                    ok = True                    # in the car: no door budget
+                else:
+                    ok = budget[k] >= 1.0 and occ[k] < d["jam_cap"]
+                if ok:
                     budget[k] -= a.size          # a bed uses ~4 person-equivalents (budget may go negative = door busy)
                     occ[k] += a.size
                     a.state = "moving"
@@ -621,7 +672,10 @@ def run(G, scenario, method, seed):
         metrics["frames"] = frames
     records = [
         {"agent": a.id, "origin": a.origin, "step_free": a.step_free, "profile": a.profile, "state": a.state,
-         "exit": a.exit, "t_left": a.t_left, "t_out": a.t_out, "exposed": a.exposed, "route_changes": a.changes}
+         "exit": a.exit, "t_left": a.t_left, "t_out": a.t_out, "exposed": a.exposed, "route_changes": a.changes,
+         "compliant": a.compliant, "via": ("lift" if a.path and any("lift" in n for n in a.path) else
+                 "ramp" if a.path and any("ramp" in n for n in a.path) else
+                 "stairs" if a.path and any("stairs" in n for n in a.path) else "level")}
         for a in agents
     ]
     return metrics, records

@@ -106,6 +106,23 @@ def test_compliance_models():
         C.PLANNER_COMPLIANCE_MODEL = "oracle"
 
 
+def test_evac_lifts_rescue_when_ramp_blocked():
+    from evac.building import load_building
+    from evac.hospital import scenarios
+    H = load_building("hospital")
+    H.remove_edges_from([(u, v) for u, v, d in H.edges(data=True) if d["etype"] == "ramp"])
+    sc = scenarios()["hosp_day_fire_stairs1_f2"]
+    assert C.EVAC_LIFTS is False
+    m0, _ = run(H.copy(), sc, "lookahead", 0)
+    C.EVAC_LIFTS = True
+    try:
+        m1, recs = run(H.copy(), sc, "lookahead", 0)
+    finally:
+        C.EVAC_LIFTS = False
+    assert m0["evacuated"] < m0["n_agents"] and m1["evacuated"] == m1["n_agents"]
+    assert any(r["via"] == "lift" for r in recs)
+
+
 if __name__ == "__main__":
     fns = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for f in fns:

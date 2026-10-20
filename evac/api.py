@@ -270,6 +270,7 @@ FIGURES = [  # (file, title, one-line takeaway) shown on the Results tab, in pre
 HOSPITAL_FIGURES = [
     ("fig18_hospital_main.png", "Hospital: main comparison", "Change in last walking person out, and exposure, per scenario."),
     ("fig32_priority.png", "Vulnerable people first", "Planner priority helps patients and does not slow anyone else."),
+    ("fig36_lifts.png", "Evacuation lifts", "Lifts rescue everyone when the ramp is lost; with the ramp working they slow beds down."),
     ("fig19_hospital_groups.png", "Hospital: patient groups", "Mean exit time for staff, walking patients, wheelchair users, beds."),
     ("fig20_hospital_weakspots.png", "Hospital: weak spots", "Which single failure cuts people off - the ramp."),
     ("fig21_hospital_assumptions.png", "Hospital: assumptions", "Bed and ramp assumptions vs the routing conclusion."),

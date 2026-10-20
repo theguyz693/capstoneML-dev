@@ -91,6 +91,19 @@ SMOKE_MIN_FRACTION = 0.10        # people never stop completely in smoke (FDS+Ev
 LIFTS_DISABLED_IN_FIRE = True
 LIFTS_ONLY_FOR_STEP_FREE = True
 
+# Evacuation lifts (Phase 2, evac/lift_study.py). Off by default (earlier results: no lift in a fire).
+# When on, lifts whose name contains one of EVAC_LIFT_NAMES are fire-protected evacuation lifts: usable in a fire,
+# by step-free people only, and modelled as a CAR: it takes up to LIFT_CAR_CAPACITY person-equivalents per trip
+# (one bed = 4, a wheelchair = 2), then needs a round trip (doors + loading + travel down and back up) before the
+# next group can board on any floor. Values are ASSUMPTIONS in the range of hospital bed lifts (2-2.5 t car,
+# ~1 m/s); see Kinsey, Galea & Lawrence (2012) and Ronchi & Nilsson (2013) on lift evacuation.
+EVAC_LIFTS = False
+EVAC_LIFT_NAMES = ("bed lift",)
+LIFT_CAR_CAPACITY = 4.0       # person-equivalents per trip (a bed + attendants, or 2 wheelchairs, or 4 slow walkers)
+LIFT_SPEED = 1.0              # m/s car speed (8 m per floor)
+LIFT_DOOR_LOAD_S = 30.0       # doors, loading at the floor, unloading at ground, per round trip
+LIFT_LOAD_WINDOW_S = 10.0     # people arriving at the floor within this time of the first one board the same car
+
 # ---------------------------------------------------------------- reactive rerouting
 # The 'reactive' method reroutes people only AFTER congestion is visible:
 # every REROUTE_INTERVAL_S, anyone standing at a node whose remaining route passes a
