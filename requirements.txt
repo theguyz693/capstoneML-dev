@@ -1,0 +1,13 @@
+# Research engine (evac/) and dashboards. Tested with Python 3.10 and 3.13.
+networkx>=3.0
+numpy>=1.24
+pandas>=1.5
+scipy>=1.10
+matplotlib>=3.6
+scikit-learn>=1.2
+lightgbm>=4.0
+joblib>=1.2
+fastapi>=0.100
+uvicorn>=0.22
+httpx>=0.24            # only for the API tests (fastapi TestClient)
+# optional: jupedsim>=1.2 and shapely>=2.0 for python -m evac.jupedsim_check

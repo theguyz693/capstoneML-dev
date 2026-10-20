@@ -380,7 +380,7 @@ async function runRace() {
   else if (f) { body.fire_node = f; body.fire_radius = 500; }
   if ($("spread").checked) {
     body.fire_spreading = true;
-    body.fire_node = body.fire_node || ((scen[$("scen").value].fires || [])[0] || {}).node || (BLD === "hospital" ? "f2_j6" : "j19");
+    body.fire_node = body.fire_node || ((scen[$("scen").value].fires || [])[0] || {}).node || (BLD === "hospital" ? "f2_j6" : BLD === "campus" ? "j19" : junctions0());
   }
   $("runBtn").disabled = true; $("status").textContent = "Simulating… (a few seconds per method)";
   if (playing) play();
@@ -495,7 +495,7 @@ async function loadWhatIfElems() {
   const els = await (await fetch(`${API}/whatif/elements${q()}`)).json();
   $("wiElems").innerHTML = els.map(e => `<label><input type="checkbox" value="${esc(e.id)}"> ${esc(e.label)}</label>`).join("");
   $("wiScen").innerHTML = Object.keys(scen).map(k => `<option value="${k}">${esc(scen[k].description || k).slice(0, 70)}</option>`).join("");
-  $("wiScen").value = BLD === "hospital" ? "hosp_day_fire_stairs1_f2" : "floor3_full_200";
+  $("wiScen").value = BLD === "hospital" ? "hosp_day_fire_stairs1_f2" : BLD === "campus" ? "floor3_full_200" : Object.keys(scen)[0];
   const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
   $("wiFire").innerHTML = `<option value="">situation default</option><option value="__none">no fire</option>` + junctions.map(j => `<option>${j}</option>`).join("");
   floorButtons($("wiFloorBtns"), f => { wiFloor = f; drawWhatIf(); }, wiFloor);
@@ -568,7 +568,7 @@ async function loadResults() {
 async function loadBuilding() {
   B = await (await fetch(`${API}/building${q()}`)).json(); NB = nodeById(); computeBounds();
   scen = await (await fetch(`${API}/scenarios${q()}`)).json();
-  const first = BLD === "hospital" ? "hosp_day_peak" : "floor3_full_200";
+  const first = BLD === "hospital" ? "hosp_day_peak" : BLD === "campus" ? "floor3_full_200" : Object.keys(scen)[0];
   $("scen").innerHTML = Object.keys(scen).map(k => `<option ${k === first ? "selected" : ""}>${k}</option>`).join("");
   const showDesc = () => {
     const s = scen[$("scen").value];
@@ -578,9 +578,10 @@ async function loadBuilding() {
   $("scen").onchange = showDesc; showDesc();
   const junctions = B.nodes.filter(n => n.kind === "junction" || n.kind === "stair").map(n => n.id).sort();
   $("fire").innerHTML = `<option value="">scenario default</option><option value="__none">no fire</option>` + junctions.map(j => `<option>${j}</option>`).join("");
-  const sDef = BLD === "hospital" ? "f2_j6" : "j19";
+  const sDef = BLD === "hospital" ? "f2_j6" : BLD === "campus" ? "j19" : "";
   $("sFire").innerHTML = `<option value="">no fire</option>` + junctions.map(j => `<option ${j === sDef ? "selected" : ""}>${j}</option>`).join("");
-  floor = BLD === "hospital" ? 2 : 3; sFloor = BLD === "hospital" ? 2 : 0; wFloor = 0;
+  floor = BLD === "hospital" ? 2 : BLD === "campus" ? 3 : 0; sFloor = BLD === "hospital" ? 2 : 0; wFloor = 0;
+  floor = Math.min(floor, (B.floors || 1) - 1); sFloor = Math.min(sFloor, (B.floors || 1) - 1);
   floorButtons($("floorBtns"), f => { floor = f; drawFrame(); }, floor);
   floorButtons($("sFloorBtns"), f => { sFloor = f; if (signs) drawSigns(); }, sFloor);
   floorButtons($("wFloorBtns"), f => { wFloor = f; drawWeak(); }, wFloor);
@@ -594,7 +595,16 @@ async function loadBuilding() {
   if (on === "whatif") { await loadWhatIfElems(); drawWhatIf(); }
 }
 
+function junctions0() {
+  const j = B.nodes.filter(n => n.kind === "junction").map(n => n.id).sort();
+  return j[Math.floor(j.length / 2)] || null;
+}
+
 (async function init() {
+  try {      // building-pack files (buildings/*.json) appear in the building menu too
+    const bl = await (await fetch(`${API}/buildings`)).json();
+    for (const n of bl.pack || []) $("bld").insertAdjacentHTML("beforeend", `<option value="${n}">${n} (building pack)</option>`);
+  } catch (e) { /* older server */ }
   $("methods").innerHTML = Object.keys(LABEL).filter(m => m !== "ml").map(m =>
     `<label><input type="checkbox" value="${m}" ${DEFAULT_METHODS.includes(m) ? "checked" : ""}><span style="color:${LINE[m]}">●</span> ${LABEL[m]}</label>`).join("");
   $("comp").oninput = () => $("compV").textContent = Math.round($("comp").value * 100) + "%";

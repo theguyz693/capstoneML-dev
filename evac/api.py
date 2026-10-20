@@ -32,10 +32,21 @@ BUILDINGS = ("campus", "hospital")
 ALLOWED = ("nearest", "safe_shortest", "reactive", "ccrp", "lookahead", "ml", "pred_formula", "pred_ml", "pred_ml_upper", "lookahead_ml")
 
 
+def _pack_names():
+    d = os.path.join(ROOT, "buildings")
+    return sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json")) if os.path.isdir(d) else []
+
+
 def _check(building):
-    if building not in BUILDINGS:
+    """campus, hospital, or any building-pack file in buildings/ (docs/BUILDING_GUIDE.md)."""
+    if building not in BUILDINGS and building not in _pack_names():
         raise HTTPException(400, f"unknown building {building}")
     return building
+
+
+@router.get("/buildings")
+def buildings():
+    return {"built_in": list(BUILDINGS), "pack": [n for n in _pack_names() if n not in BUILDINGS]}
 
 
 def G0(building="campus"):
@@ -48,6 +59,14 @@ def _scenarios(building="campus"):
     if _check(building) == "hospital":
         from .hospital import scenarios as hs
         return hs()
+    if building != "campus":                  # a building-pack file: generic scenarios
+        G = G0(building)
+        from .building import room_nodes
+        n = max(20, 2 * len(room_nodes(G)))
+        return {f"spread_{n}": {"description": f"{n} people spread over the building, no fire", "n_agents": n,
+                                "spawn": "building", "step_free_frac": 0.05, "fires": []},
+                f"spread_{2 * n}": {"description": f"{2 * n} people spread over the building, no fire",
+                                    "n_agents": 2 * n, "spawn": "building", "step_free_frac": 0.05, "fires": []}}
     with open(os.path.join(HERE, "scenarios.json"), encoding="utf-8") as f:
         return json.load(f)
 

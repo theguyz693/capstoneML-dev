@@ -1,0 +1,342 @@
+{
+ "name": "example_office",
+ "description": "Example: 2-storey office, 1 corridor, 2 stairwells, 1 lift, 2 exits. Copy this file to start your own building.",
+ "units": "m",
+ "nodes": {
+  "g_j0": [
+   0,
+   0,
+   0
+  ],
+  "g_j1": [
+   10,
+   0,
+   0
+  ],
+  "g_j2": [
+   20,
+   0,
+   0
+  ],
+  "g_j3": [
+   30,
+   0,
+   0
+  ],
+  "g_j4": [
+   40,
+   0,
+   0
+  ],
+  "g_office north 1": [
+   5,
+   6,
+   0
+  ],
+  "g_office south 1": [
+   5,
+   -6,
+   0
+  ],
+  "g_office north 2": [
+   15,
+   6,
+   0
+  ],
+  "g_office south 2": [
+   15,
+   -6,
+   0
+  ],
+  "g_office north 3": [
+   25,
+   6,
+   0
+  ],
+  "g_office south 3": [
+   25,
+   -6,
+   0
+  ],
+  "g_office north 4": [
+   35,
+   6,
+   0
+  ],
+  "g_office south 4": [
+   35,
+   -6,
+   0
+  ],
+  "g_meeting room": [
+   20,
+   8,
+   0
+  ],
+  "g_stairs 1": [
+   -1,
+   2,
+   0
+  ],
+  "g_stairs 2": [
+   41,
+   2,
+   0
+  ],
+  "g_lift": [
+   20,
+   -3,
+   0
+  ],
+  "f1_j0": [
+   0,
+   0,
+   1
+  ],
+  "f1_j1": [
+   10,
+   0,
+   1
+  ],
+  "f1_j2": [
+   20,
+   0,
+   1
+  ],
+  "f1_j3": [
+   30,
+   0,
+   1
+  ],
+  "f1_j4": [
+   40,
+   0,
+   1
+  ],
+  "f1_office north 1": [
+   5,
+   6,
+   1
+  ],
+  "f1_office south 1": [
+   5,
+   -6,
+   1
+  ],
+  "f1_office north 2": [
+   15,
+   6,
+   1
+  ],
+  "f1_office south 2": [
+   15,
+   -6,
+   1
+  ],
+  "f1_office north 3": [
+   25,
+   6,
+   1
+  ],
+  "f1_office south 3": [
+   25,
+   -6,
+   1
+  ],
+  "f1_office north 4": [
+   35,
+   6,
+   1
+  ],
+  "f1_office south 4": [
+   35,
+   -6,
+   1
+  ],
+  "f1_meeting room": [
+   20,
+   8,
+   1
+  ],
+  "f1_stairs 1": [
+   -1,
+   2,
+   1
+  ],
+  "f1_stairs 2": [
+   41,
+   2,
+   1
+  ],
+  "f1_lift": [
+   20,
+   -3,
+   1
+  ],
+  "west exit": [
+   -4,
+   0,
+   0
+  ],
+  "east exit": [
+   44,
+   0,
+   0
+  ]
+ },
+ "edges": [
+  [
+   "g_j0",
+   "g_j1"
+  ],
+  [
+   "g_j1",
+   "g_j2"
+  ],
+  [
+   "g_j2",
+   "g_j3"
+  ],
+  [
+   "g_j3",
+   "g_j4"
+  ],
+  [
+   "g_office north 1",
+   "g_j0"
+  ],
+  [
+   "g_office south 1",
+   "g_j0"
+  ],
+  [
+   "g_office north 2",
+   "g_j1"
+  ],
+  [
+   "g_office south 2",
+   "g_j1"
+  ],
+  [
+   "g_office north 3",
+   "g_j3"
+  ],
+  [
+   "g_office south 3",
+   "g_j3"
+  ],
+  [
+   "g_office north 4",
+   "g_j4"
+  ],
+  [
+   "g_office south 4",
+   "g_j4"
+  ],
+  [
+   "g_meeting room",
+   "g_j2"
+  ],
+  [
+   "g_stairs 1",
+   "g_j0"
+  ],
+  [
+   "g_stairs 2",
+   "g_j4"
+  ],
+  [
+   "g_lift",
+   "g_j2"
+  ],
+  [
+   "f1_j0",
+   "f1_j1"
+  ],
+  [
+   "f1_j1",
+   "f1_j2"
+  ],
+  [
+   "f1_j2",
+   "f1_j3"
+  ],
+  [
+   "f1_j3",
+   "f1_j4"
+  ],
+  [
+   "f1_office north 1",
+   "f1_j0"
+  ],
+  [
+   "f1_office south 1",
+   "f1_j0"
+  ],
+  [
+   "f1_office north 2",
+   "f1_j1"
+  ],
+  [
+   "f1_office south 2",
+   "f1_j1"
+  ],
+  [
+   "f1_office north 3",
+   "f1_j3"
+  ],
+  [
+   "f1_office south 3",
+   "f1_j3"
+  ],
+  [
+   "f1_office north 4",
+   "f1_j4"
+  ],
+  [
+   "f1_office south 4",
+   "f1_j4"
+  ],
+  [
+   "f1_meeting room",
+   "f1_j2"
+  ],
+  [
+   "f1_stairs 1",
+   "f1_j0"
+  ],
+  [
+   "f1_stairs 2",
+   "f1_j4"
+  ],
+  [
+   "f1_lift",
+   "f1_j2"
+  ],
+  [
+   "g_stairs 1",
+   "f1_stairs 1"
+  ],
+  [
+   "g_stairs 2",
+   "f1_stairs 2"
+  ],
+  [
+   "g_lift",
+   "f1_lift"
+  ],
+  [
+   "west exit",
+   "g_j0"
+  ],
+  [
+   "east exit",
+   "g_j4"
+  ]
+ ],
+ "widths": {
+  "g_meeting room|g_j2": 1.6,
+  "f1_meeting room|f1_j2": 1.6,
+  "g_j4|east exit": 1.2
+ }
+}

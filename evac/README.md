@@ -116,6 +116,8 @@ python -m evac.scalability         # 4. re-plan time vs building size and crowd 
 python -m evac.jam_study           # 5. does guidance create new jams elsewhere? (secondary jams) -> docs/jam_study.md
 python -m evac.compliance_study    # 6. planner that does not know who follows it (naive / compliance-aware) -> docs/compliance.md
 python -m evac.lift_study          # 7. fire-protected evacuation lifts in the hospital (config.EVAC_LIFTS) -> docs/lifts.md
+python -m evac.reproduce_all       # 8. EVERYTHING in one command (see docs/REPRODUCE.md); --list, --only, --from, --fresh
+python -m evac.building_pack check buildings/example_office.json   # 8. any floor plan as one JSON file (docs/BUILDING_GUIDE.md)
 python tests/test_evac_phase2.py
 ```
 Time-to-exit ranges on the dashboard route and kiosk signs are calibrated per band of predicted time
@@ -161,6 +163,8 @@ Research Lab: "Safety vs speed" slider (sent as `safety_weight` to `/api/researc
 | `jam_study.py` | Secondary jams (Choi et al. 2021): jams created by guidance that shortest path does not have; total queueing (Phase 2). |
 | `compliance_study.py` | Planner without knowledge of who complies: oracle vs naive vs compliance-aware booking (Phase 2). |
 | `lift_study.py` | Evacuation lifts (car model: one group per round trip) with and without the ramp (Phase 2). |
+| `reproduce_all.py` | One command that regenerates every result, report and figure, then runs the tests (Phase 2). |
+| `building_pack.py` | Building pack: export / check / run any building stored as one JSON file in `buildings/` (Phase 2). |
 | `summarize.py` | Report tables: mean + 95% bootstrap CI, paired differences vs a reference method, Wilcoxon test. |
 
 `building.build_graph(nodes, edges)` loads **any** building from plain data — use it for the hospital.

@@ -125,11 +125,41 @@ def build_graph(nodes, edges, floor_height=350, kinds=None):
 
 
 def load_building(name="campus"):
-    """'campus' (default) or 'hospital'."""
+    """'campus' (default), 'hospital', or any building-pack file: a path to a .json file, or the name of one in
+    buildings/ (see docs/BUILDING_GUIDE.md and evac/building_pack.py)."""
+    import os
     if name == "hospital":
         from .hospital import load_hospital
         return load_hospital()
-    return load_campus()
+    if name == "campus":
+        return load_campus()
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for p in (name, os.path.join(root, "buildings", name), os.path.join(root, "buildings", f"{name}.json")):
+        if os.path.isfile(p):
+            return load_building_file(p)
+    raise ValueError(f"unknown building {name!r} (campus, hospital, or a file in buildings/)")
+
+
+def load_building_file(path):
+    """Load a building-pack JSON file:
+        {"name": ..., "units": "m",
+         "nodes": {"<name>": [x_m, y_m, floor], ...},
+         "edges": [["<u>", "<v>"], ...],
+         "kinds": {"<name>": "room|junction|stair|lift|ramp|exit"},     (optional - else taken from the names)
+         "widths": {"<u>|<v>": clear_width_m, ...}}                      (optional - else config.WIDTH_M by type)
+    Coordinates are metres; floors are integers (0 = ground)."""
+    import json
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    u = 1.0 / C.METERS_PER_UNIT
+    nodes = {n: (x * u, y * u, int(fl)) for n, (x, y, fl) in doc["nodes"].items()}
+    G = build_graph(nodes, [tuple(e) for e in doc["edges"]], kinds=doc.get("kinds"))
+    for key, w in (doc.get("widths") or {}).items():
+        a, b = key.split("|")
+        if G.has_edge(a, b):
+            set_edge_width(G.edges[a, b], float(w))
+    G.graph["name"] = doc.get("name", path)
+    return G
 
 
 def load_campus():
