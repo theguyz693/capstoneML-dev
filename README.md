@@ -83,6 +83,4 @@ A full run from scratch takes about 4 hours on a 2-core laptop. Details: [docs/R
 - Very large towers exceed the 5 s re-plan budget ([docs/scalability.md](docs/scalability.md)).
 - The real-data sample in `data/juelich/` comes from the Juelich data archive. Check its licence and citation before reusing it.
 
-## Team
 
-Team 212: Nishant Trivedi, Raghu Vamshi, Skanda R, Pranav U S. Supervisor: Dr. Vishnu Shankar Tiwari.
